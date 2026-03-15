@@ -1,9 +1,6 @@
 [build]
 builder = "nixpacks"
 
-[build.nixpacksPlan]
-providers = ["bun"]
-
 [deploy]
 startCommand = "bun run src/index.ts"
 healthcheckPath = "/health"
