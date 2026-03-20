@@ -1,5 +1,4 @@
 import { hash } from "bcryptjs";
-import { randomBytes } from "crypto";
 
 const adminEmail = process.env.ADMIN_EMAIL ?? "admin@campo.com";
 const adminName = process.env.ADMIN_NAME ?? "Administrador";
@@ -35,14 +34,10 @@ async function main() {
     } else {
       console.log(`👤 Creando nuevo usuario administrador: ${adminEmail}`);
 
-      // Generar una contraseña aleatoria y hashearla (requerida por el esquema)
-      const randomPassword = randomBytes(16).toString("hex");
-      const hashedPassword = await hash(randomPassword, 10);
-
       // Insertar el nuevo usuario
       const [newUser] = await sql`
-        INSERT INTO usuarios (correo, nombre, rol, activo, password)
-        VALUES (${adminEmail}, ${adminName}, 'admin', true, ${hashedPassword})
+        INSERT INTO usuarios (correo, nombre, rol, activo)
+        VALUES (${adminEmail}, ${adminName}, 'admin', true)
         RETURNING id
       `;
       userId = newUser.id;
