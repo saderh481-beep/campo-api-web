@@ -71,6 +71,18 @@ app.post(
   ),
   async (c) => {
     const body = c.req.valid("json");
+
+    const [dupCorreo] = await sql`
+      SELECT id FROM tecnicos WHERE correo = ${body.correo} AND activo = true
+    `;
+    if (dupCorreo) return c.json({ error: "Ya existe un técnico activo con ese correo" }, 409);
+
+    const [coordinador] = await sql`
+      SELECT id FROM usuarios
+      WHERE id = ${body.coordinador_id} AND rol = 'coordinador' AND activo = true
+    `;
+    if (!coordinador) return c.json({ error: "Coordinador inválido o inactivo" }, 400);
+
     const [nuevo] = await sql`
       INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite)
       VALUES (${body.nombre}, ${body.correo}, ${body.telefono ?? null}, ${body.coordinador_id}, ${body.fecha_limite})

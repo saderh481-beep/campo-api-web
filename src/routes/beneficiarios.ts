@@ -72,6 +72,16 @@ app.post(
   ),
   async (c) => {
     const body = c.req.valid("json");
+    const user = c.get("user");
+
+    const [tecnico] = await sql`
+      SELECT id, coordinador_id FROM tecnicos
+      WHERE id = ${body.tecnico_id} AND activo = true
+    `;
+    if (!tecnico) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
+    if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+      return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+    }
 
     if (body.curp) {
       const [dup] = await sql`SELECT id FROM beneficiarios WHERE curp = ${body.curp}`;

@@ -22,12 +22,13 @@ app.get("/", async (c) => {
 app.post(
   "/",
   requireRole("admin"),
-  zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional(), created_by: z.string().uuid() })),
+  zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
   async (c) => {
     const body = c.req.valid("json");
+    const user = c.get("user");
     const [nueva] = await sql`
       INSERT INTO actividades (nombre, descripcion, created_by)
-      VALUES (${body.nombre}, ${body.descripcion ?? null}, ${body.created_by})
+      VALUES (${body.nombre}, ${body.descripcion ?? null}, ${user.sub})
       RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
     `;
     return c.json(nueva, 201);

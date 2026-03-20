@@ -21,6 +21,10 @@ export async function enviarOtp(correo: string, otp: string): Promise<void> {
   });
 }
 
+export async function enviarCodigoAcceso(correo: string, codigoAcceso: string): Promise<void> {
+  await enviarOtp(correo, codigoAcceso);
+}
+
 export async function enviarCodigoTecnico(
   correo: string,
   nombre: string,
