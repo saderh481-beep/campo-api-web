@@ -24,6 +24,9 @@ const verifyCodigoSchema = z.object({
   correo: z.string().email(),
   codigo_acceso: z.string().length(6).optional(),
   otp: z.string().length(6).optional(),
+}).refine((data) => Boolean(data.codigo_acceso ?? data.otp), {
+  message: "Debes enviar codigo_acceso",
+  path: ["codigo_acceso"],
 });
 
 async function requestCodigoAcceso(c: any) {

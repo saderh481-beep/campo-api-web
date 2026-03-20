@@ -1,20 +1,26 @@
-import { sql } from "./src/db";
-import { redis } from "./src/lib/redis";
-import { enviarCodigoAcceso } from "./src/lib/mailer";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 
-// Configurar variables de entorno (como indica el script)
-process.env.DATABASE_URL = "postgresql://postgres:UWhGVarVKUDkrJQWaWWvQhieBauYQTZA@ballast.proxy.rlwy.net:55528/railway";
-process.env.REDIS_URL = "redis://default:SdekIELQIOJNBXLIUXHgDfHQhfqSwgqU@mainline.proxy.rlwy.net:26908";
-process.env.NODE_ENV = "development";
-
-const adminEmail = "admin@campo.com";
-const adminName = "Administrador";
-const CODIGO_ACCESO_TTL = 600; // 10 minutos
+const adminEmail = process.env.ADMIN_EMAIL ?? "admin@campo.com";
+const adminName = process.env.ADMIN_NAME ?? "Administrador";
+const CODIGO_ACCESO_TTL = Number(process.env.CODIGO_ACCESO_TTL ?? 600);
 
 async function main() {
   try {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL no esta configurado");
+    }
+    if (!process.env.REDIS_URL && !process.env.REDIS_PUBLIC_URL) {
+      throw new Error("REDIS_URL o REDIS_PUBLIC_URL no esta configurado");
+    }
+
+    // Cargar modulos despues de validar env para evitar inicializacion con valores incorrectos.
+    const [{ sql }, { redis }, { enviarCodigoAcceso }] = await Promise.all([
+      import("./src/db"),
+      import("./src/lib/redis"),
+      import("./src/lib/mailer"),
+    ]);
+
     console.log(`🔍 Verificando si existe el usuario ${adminEmail}...`);
 
     // Verificar si el usuario ya existe

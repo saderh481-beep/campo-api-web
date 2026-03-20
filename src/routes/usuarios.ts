@@ -59,6 +59,14 @@ app.patch(
     const [usuario] = await sql`SELECT id FROM usuarios WHERE id = ${id}`;
     if (!usuario) return c.json({ error: "Usuario no encontrado" }, 404);
 
+    if (body.correo) {
+      const [dupCorreo] = await sql`
+        SELECT id FROM usuarios
+        WHERE correo = ${body.correo} AND id <> ${id}
+      `;
+      if (dupCorreo) return c.json({ error: "El correo ya está registrado" }, 409);
+    }
+
     const [actualizado] = await sql`
       UPDATE usuarios SET
         nombre = COALESCE(${body.nombre ?? null}, nombre),
