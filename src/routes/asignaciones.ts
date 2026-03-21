@@ -10,7 +10,7 @@ const app = new Hono<{
     user: JwtPayload
   }
 }>();
-app.use("*", authMiddleware, requireRole("admin"));
+app.use("*", authMiddleware, requireRole("administrador"));
 
 app.post(
   "/beneficiario",
@@ -21,12 +21,27 @@ app.post(
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
-    const [nueva] = await sql`
-      INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-      VALUES (${body.tecnico_id}, ${body.beneficiario_id}, ${user.sub})
-      ON CONFLICT (tecnico_id, beneficiario_id) DO UPDATE SET activo = true, removido_en = NULL
-      RETURNING id, tecnico_id, beneficiario_id, activo, creado_en
+    const [existente] = await sql`
+      SELECT id
+      FROM asignaciones_beneficiario
+      WHERE tecnico_id = ${body.tecnico_id} AND beneficiario_id = ${body.beneficiario_id}
+      ORDER BY asignado_en DESC
+      LIMIT 1
     `;
+
+    const [nueva] = existente
+      ? await sql`
+          UPDATE asignaciones_beneficiario
+          SET activo = true, removido_en = NULL
+          WHERE id = ${existente.id}
+          RETURNING id, tecnico_id, beneficiario_id, activo, asignado_por, asignado_en, removido_en
+        `
+      : await sql`
+          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
+          VALUES (${body.tecnico_id}, ${body.beneficiario_id}, ${user.sub})
+          RETURNING id, tecnico_id, beneficiario_id, activo, asignado_por, asignado_en, removido_en
+        `;
+
     return c.json(nueva, 201);
   }
 );
@@ -50,12 +65,27 @@ app.post(
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
-    const [nueva] = await sql`
-      INSERT INTO asignaciones_actividad (tecnico_id, actividad_id, asignado_por)
-      VALUES (${body.tecnico_id}, ${body.actividad_id}, ${user.sub})
-      ON CONFLICT (tecnico_id, actividad_id) DO UPDATE SET activo = true, removido_en = NULL
-      RETURNING id, tecnico_id, actividad_id, activo, creado_en
+    const [existente] = await sql`
+      SELECT id
+      FROM asignaciones_actividad
+      WHERE tecnico_id = ${body.tecnico_id} AND actividad_id = ${body.actividad_id}
+      ORDER BY asignado_en DESC
+      LIMIT 1
     `;
+
+    const [nueva] = existente
+      ? await sql`
+          UPDATE asignaciones_actividad
+          SET activo = true, removido_en = NULL
+          WHERE id = ${existente.id}
+          RETURNING id, tecnico_id, actividad_id, activo, asignado_por, asignado_en, removido_en
+        `
+      : await sql`
+          INSERT INTO asignaciones_actividad (tecnico_id, actividad_id, asignado_por)
+          VALUES (${body.tecnico_id}, ${body.actividad_id}, ${user.sub})
+          RETURNING id, tecnico_id, actividad_id, activo, asignado_por, asignado_en, removido_en
+        `;
+
     return c.json(nueva, 201);
   }
 );

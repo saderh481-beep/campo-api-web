@@ -49,8 +49,8 @@ export async function generarPdfBitacora(
     ["Estado", bitacora.estado],
     ["Fecha inicio", bitacora.fecha_inicio],
     ["Fecha fin", bitacora.fecha_fin ?? "—"],
-    ["Observaciones", bitacora.observaciones ?? "—"],
-    ["Actividades realizadas", bitacora.actividades_realizadas ?? "—"],
+    ["Observaciones", bitacora.observaciones_coordinador ?? "—"],
+    ["Actividades realizadas", bitacora.actividades_desc ?? "—"],
   ];
 
   for (const [label, value] of campos) {

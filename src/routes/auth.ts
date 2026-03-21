@@ -1,119 +1,77 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { hash, compare } from "bcryptjs";
+import { compare } from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import { sql } from "@/db";
 import { redis } from "@/lib/redis";
-import { signJwt } from "@/lib/jwt";
-import { enviarCodigoAcceso } from "@/lib/mailer";
 import { rateLimitMiddleware } from "@/middleware/ratelimit";
 import { authMiddleware } from "@/middleware/auth";
 
 const app = new Hono();
 
-const CODIGO_ACCESO_TTL = 600;
-const MAX_ATTEMPTS = 3;
-const BLOCK_TTL = 1800;
-
-function generarCodigoAcceso(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+const SESSION_TTL_SECONDS = 86400;
 
 const requestCodigoSchema = z.object({ correo: z.string().email() });
-const verifyCodigoSchema = z.object({
+
+const loginSchema = z.object({
   correo: z.string().email(),
-  codigo_acceso: z.string().length(6).optional(),
-  otp: z.string().length(6).optional(),
-}).refine((data) => Boolean(data.codigo_acceso ?? data.otp), {
-  message: "Debes enviar codigo_acceso",
-  path: ["codigo_acceso"],
+  codigo_acceso: z.string().regex(/^\d{5,6}$/, "El codigo_acceso debe tener 5 o 6 digitos"),
 });
 
 async function requestCodigoAcceso(c: any) {
-  const { correo } = c.req.valid("json");
-
-  const bloqueado = await redis.get(`block:${correo}`);
-  if (bloqueado) {
-    return c.json({ message: "Si el correo existe, recibirás un código" });
-  }
-
-  const [usuario] = await sql`
-    SELECT id FROM usuarios WHERE correo = ${correo} AND activo = true
-  `;
-  if (!usuario) {
-    return c.json({ message: "Si el correo existe, recibirás un código" });
-  }
-
-  const codigoAcceso = generarCodigoAcceso();
-  const hashed = await hash(codigoAcceso, 10);
-
-  await redis.setex(`codigo_acceso:${correo}`, CODIGO_ACCESO_TTL, hashed);
-  await redis.del(`otp:${correo}`);
-  await redis.del(`fail:${correo}`);
-
-  try {
-    await enviarCodigoAcceso(correo, codigoAcceso);
-  } catch (err) {
-    console.error("[codigo_acceso] Error al enviar correo:", err);
-  }
-
-  return c.json({ message: "Si el correo existe, recibirás un código" });
+  c.req.valid("json");
+  return c.json({
+    message: "Este endpoint ya no genera codigos. Usa el codigo_acceso asignado al usuario.",
+  });
 }
 
-async function verifyCodigoAcceso(c: any) {
-  const { correo, codigo_acceso, otp } = c.req.valid("json");
-  const codigo = codigo_acceso ?? otp;
-
-  if (!codigo) {
-    return c.json({ error: "codigo_acceso es requerido" }, 400);
-  }
-
-  const bloqueado = await redis.get(`block:${correo}`);
-  if (bloqueado) {
-    return c.json({ error: "Cuenta bloqueada temporalmente. Intenta en 30 minutos" }, 429);
-  }
-
-  const stored = (await redis.get(`codigo_acceso:${correo}`)) ?? (await redis.get(`otp:${correo}`));
-  if (!stored) {
-    return c.json({ error: "Código inválido o expirado" }, 401);
-  }
-
-  const valido = await compare(codigo, stored);
-  if (!valido) {
-    const intentos = await redis.incr(`fail:${correo}`);
-    if (intentos === 1) await redis.expire(`fail:${correo}`, CODIGO_ACCESO_TTL);
-    if (intentos >= MAX_ATTEMPTS) {
-      await redis.setex(`block:${correo}`, BLOCK_TTL, "1");
-      await redis.del(`codigo_acceso:${correo}`);
-      await redis.del(`otp:${correo}`);
-      return c.json({ error: "Demasiados intentos. Cuenta bloqueada 30 minutos" }, 429);
-    }
-    return c.json({ error: "Código incorrecto" }, 401);
-  }
+async function login(c: any) {
+  const { correo, codigo_acceso } = c.req.valid("json");
 
   const [usuario] = await sql`
-    SELECT id, nombre, rol FROM usuarios WHERE correo = ${correo} AND activo = true
+    SELECT id, nombre, correo, rol, hash_codigo_acceso
+    FROM usuarios
+    WHERE correo = ${correo} AND activo = true
   `;
-  if (!usuario) return c.json({ error: "Usuario no encontrado" }, 401);
+  if (!usuario?.hash_codigo_acceso) {
+    return c.json({ error: "Credenciales invalidas" }, 401);
+  }
 
-  await redis.del(`codigo_acceso:${correo}`);
-  await redis.del(`otp:${correo}`);
-  await redis.del(`fail:${correo}`);
+  const valido = await compare(codigo_acceso, usuario.hash_codigo_acceso);
+  if (!valido) {
+    return c.json({ error: "Credenciales invalidas" }, 401);
+  }
 
-  const token = await signJwt({ sub: usuario.id, rol: usuario.rol, nombre: usuario.nombre });
+  const token = randomUUID();
+  const createdAt = new Date().toISOString();
+  const sessionPayload = {
+    usuario_id: usuario.id,
+    rol: usuario.rol,
+    nombre: usuario.nombre,
+    correo: usuario.correo,
+    created_at: createdAt,
+  };
+
+  await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionPayload));
+
+  const ip = (c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "unknown").split(",")[0].trim();
+  const userAgent = c.req.header("user-agent") ?? null;
 
   await sql`
-    INSERT INTO auth_logs (usuario_id, evento, ip)
-    VALUES (${usuario.id}, 'login', ${c.req.header("x-forwarded-for") ?? "unknown"})
+    INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)
+    VALUES (${usuario.id}, 'usuario', 'login', ${ip}, ${userAgent})
   `;
 
-  return c.json(
-    { message: "Autenticado correctamente", usuario: { nombre: usuario.nombre, rol: usuario.rol } },
-    200,
-    {
-      "Set-Cookie": `session=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=28800${process.env.NODE_ENV === "production" ? "; Secure" : ""}`,
-    }
-  );
+  return c.json({
+    token,
+    usuario: {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      correo: usuario.correo,
+      rol: usuario.rol,
+    },
+  });
 }
 
 app.post(
@@ -126,20 +84,37 @@ app.post(
 app.post(
   "/verify-codigo-acceso",
   rateLimitMiddleware(10, 60),
-  zValidator("json", verifyCodigoSchema),
-  verifyCodigoAcceso
+  zValidator("json", loginSchema),
+  login
 );
+
+app.post("/login", rateLimitMiddleware(10, 60), zValidator("json", loginSchema), login);
 
 // Compatibilidad temporal con clientes existentes
 app.post("/request-otp", rateLimitMiddleware(5, 60), zValidator("json", requestCodigoSchema), requestCodigoAcceso);
-app.post("/verify-otp", rateLimitMiddleware(10, 60), zValidator("json", verifyCodigoSchema), verifyCodigoAcceso);
+app.post("/verify-otp", rateLimitMiddleware(10, 60), zValidator("json", loginSchema), login);
 
 app.post("/logout", authMiddleware, async (c) => {
-  return c.json(
-    { message: "Sesión cerrada" },
-    200,
-    { "Set-Cookie": "session=; HttpOnly; Path=/; Max-Age=0" }
-  );
+  const token = c.get("sessionToken") as string | undefined;
+  const user = c.get("user");
+
+  if (token) {
+    await redis.del(`session:${token}`);
+  }
+
+  if (user?.sub) {
+    const ip = (c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "unknown")
+      .split(",")[0]
+      .trim();
+    const userAgent = c.req.header("user-agent") ?? null;
+
+    await sql`
+      INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)
+      VALUES (${user.sub}, 'usuario', 'logout', ${ip}, ${userAgent})
+    `;
+  }
+
+  return c.json({ message: "Sesion cerrada" });
 });
 
 export default app;

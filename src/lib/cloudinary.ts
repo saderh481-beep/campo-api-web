@@ -8,11 +8,11 @@ cloudinary.config({
 
 function upload(
   buffer: Buffer,
-  options: Parameters<typeof cloudinary.uploader.upload_stream>[0]
+  options: Record<string, unknown>
 ): Promise<{ secure_url: string; public_id: string }> {
   return new Promise((resolve, reject) => {
     cloudinary.uploader
-      .upload_stream(options, (err, result) => {
+      .upload_stream(options as any, (err, result) => {
         if (err || !result) return reject(err ?? new Error("Upload failed"));
         resolve({ secure_url: result.secure_url, public_id: result.public_id });
       })

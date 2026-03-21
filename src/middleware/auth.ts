@@ -1,38 +1,58 @@
-import { verifyJwt, type JwtPayload } from "@/lib/jwt";
 import { createMiddleware } from "hono/factory";
-import { sql } from "@/db";
+import { redis } from "@/lib/redis";
+import type { JwtPayload } from "@/lib/jwt";
 
-type Env = { Variables: { user: JwtPayload } };
+type SessionPayload = {
+  usuario_id: string;
+  rol: JwtPayload["rol"];
+  nombre: string;
+  correo: string;
+  created_at: string;
+};
+
+type Env = { Variables: { user: JwtPayload; sessionToken: string } };
 
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
-  const cookie = c.req.header("cookie") ?? "";
-  const match = cookie.match(/session=([^;]+)/);
-  const token = match?.[1];
+  const authHeader = c.req.header("authorization") ?? "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
 
   if (!token) return c.json({ error: "No autenticado" }, 401);
 
-  const payload = await verifyJwt(token);
-  if (!payload) return c.json({ error: "Token inválido o expirado" }, 401);
+  const rawSession = await redis.get(`session:${token}`);
+  if (!rawSession) return c.json({ error: "Token invalido o expirado" }, 401);
 
-  const [usuario] = await sql`
-    SELECT id, nombre, rol, activo
-    FROM usuarios
-    WHERE id = ${payload.sub}
-  `;
-
-  if (!usuario || !usuario.activo) {
-    return c.json({ error: "Usuario no autorizado" }, 401);
+  let session: SessionPayload;
+  try {
+    session = JSON.parse(rawSession) as SessionPayload;
+  } catch {
+    return c.json({ error: "Sesion invalida" }, 401);
   }
 
-  c.set("user", { sub: usuario.id, nombre: usuario.nombre, rol: usuario.rol });
+  c.set("sessionToken", token);
+  c.set("user", {
+    sub: session.usuario_id,
+    nombre: session.nombre,
+    rol: session.rol,
+    correo: session.correo,
+  });
+
   return next();
 });
 
-export function requireRole(...roles: JwtPayload["rol"][]) {
+function normalizeRole(role: string): string {
+  return role === "admin" ? "administrador" : role;
+}
+
+export function requireRole(...roles: string[]) {
   return createMiddleware<Env>(async (c, next) => {
     const user = c.get("user");
     if (!user) return c.json({ error: "No autenticado" }, 401);
-    if (!roles.includes(user.rol)) return c.json({ error: "Sin permisos" }, 403);
+
+    const expectedRoles = roles.map(normalizeRole);
+    const userRole = normalizeRole(user.rol);
+
+    if (!expectedRoles.includes(userRole)) return c.json({ error: "Sin permisos" }, 403);
     return next();
   });
 }

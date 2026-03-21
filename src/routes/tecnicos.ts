@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { redis } from "@/lib/redis";
 import { enviarCodigoTecnico } from "@/lib/mailer";
@@ -10,10 +11,10 @@ const app = new Hono();
 
 app.use("*", authMiddleware);
 
-app.get("/", requireRole("admin", "coordinador"), async (c) => {
+app.get("/", requireRole("administrador", "coordinador"), async (c) => {
   const user = c.get("user");
   const tecnicos =
-    user.rol === "admin"
+    user.rol === "administrador"
       ? await sql`
           SELECT t.*, u.nombre AS coordinador_nombre
           FROM tecnicos t
@@ -31,7 +32,7 @@ app.get("/", requireRole("admin", "coordinador"), async (c) => {
   return c.json(tecnicos);
 });
 
-app.get("/:id", requireRole("admin", "coordinador"), async (c) => {
+app.get("/:id", requireRole("administrador", "coordinador"), async (c) => {
   const { id } = c.req.param();
   const user = c.get("user");
 
@@ -58,7 +59,7 @@ app.get("/:id", requireRole("admin", "coordinador"), async (c) => {
 
 app.post(
   "/",
-  requireRole("admin"),
+  requireRole("administrador"),
   zValidator(
     "json",
     z.object({
@@ -86,7 +87,7 @@ app.post(
     const [nuevo] = await sql`
       INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite)
       VALUES (${body.nombre}, ${body.correo}, ${body.telefono ?? null}, ${body.coordinador_id}, ${body.fecha_limite})
-      RETURNING id, nombre, correo, telefono, fecha_limite, activo, creado_en
+      RETURNING id, nombre, correo, telefono, fecha_limite, activo, created_at, updated_at
     `;
     return c.json(nuevo, 201);
   }
@@ -94,7 +95,7 @@ app.post(
 
 app.patch(
   "/:id",
-  requireRole("admin"),
+  requireRole("administrador"),
   zValidator(
     "json",
     z.object({
@@ -115,31 +116,29 @@ app.patch(
         telefono      = COALESCE(${body.telefono ?? null}, telefono),
         coordinador_id = COALESCE(${body.coordinador_id ?? null}, coordinador_id),
         fecha_limite  = COALESCE(${body.fecha_limite ?? null}, fecha_limite),
-        actualizado_en = NOW()
+        updated_at = NOW()
       WHERE id = ${id}
-      RETURNING id, nombre, correo, telefono, fecha_limite, activo
+      RETURNING id, nombre, correo, telefono, fecha_limite, activo, created_at, updated_at
     `;
     if (!actualizado) return c.json({ error: "Técnico no encontrado" }, 404);
     return c.json(actualizado);
   }
 );
 
-app.post("/:id/codigo", requireRole("admin"), async (c) => {
+app.post("/:id/codigo", requireRole("administrador"), async (c) => {
   const { id } = c.req.param();
   const [tecnico] = await sql`
     SELECT id, nombre, correo, fecha_limite FROM tecnicos WHERE id = ${id} AND activo = true
   `;
   if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
 
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const codigo = Array.from({ length: 5 }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
+  const codigo = randomInt(10000, 100000).toString();
 
   const fechaLimite = new Date(tecnico.fecha_limite);
   const ttl = Math.max(1, Math.floor((fechaLimite.getTime() - Date.now()) / 1000));
 
   await redis.setex(`tech:${codigo}`, ttl, tecnico.id);
+  await sql`UPDATE tecnicos SET codigo_acceso = ${codigo}, updated_at = NOW() WHERE id = ${id}`;
 
   try {
     await enviarCodigoTecnico(tecnico.correo, tecnico.nombre, codigo, fechaLimite);
@@ -150,10 +149,10 @@ app.post("/:id/codigo", requireRole("admin"), async (c) => {
   return c.json({ message: "Código generado y enviado", codigo });
 });
 
-app.delete("/:id", requireRole("admin"), async (c) => {
+app.delete("/:id", requireRole("administrador"), async (c) => {
   const { id } = c.req.param();
   const [tecnico] = await sql`
-    UPDATE tecnicos SET activo = false, actualizado_en = NOW()
+    UPDATE tecnicos SET activo = false, updated_at = NOW()
     WHERE id = ${id}
     RETURNING id
   `;

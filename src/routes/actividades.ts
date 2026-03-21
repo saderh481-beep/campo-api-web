@@ -10,7 +10,7 @@ const app = new Hono<{
     user: JwtPayload
   }
 }>();
-app.use("*", authMiddleware, requireRole("admin", "coordinador"));
+app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
 
 app.get("/", async (c) => {
   const actividades = await sql`
@@ -21,7 +21,7 @@ app.get("/", async (c) => {
 
 app.post(
   "/",
-  requireRole("admin"),
+  requireRole("administrador"),
   zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
   async (c) => {
     const body = c.req.valid("json");
@@ -37,7 +37,7 @@ app.post(
 
 app.patch(
   "/:id",
-  requireRole("admin"),
+  requireRole("administrador"),
   zValidator(
     "json",
     z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional(), created_by: z.string().uuid().optional() })
@@ -50,7 +50,7 @@ app.patch(
         nombre      = COALESCE(${body.nombre ?? null}, nombre),
         descripcion = COALESCE(${body.descripcion ?? null}, descripcion),
         created_by  = COALESCE(${body.created_by ?? null}, created_by),
-        actualizado_en = NOW()
+        updated_at = NOW()
       WHERE id = ${id}
       RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
     `;
@@ -59,9 +59,9 @@ app.patch(
   }
 );
 
-app.delete("/:id", requireRole("admin"), async (c) => {
+app.delete("/:id", requireRole("administrador"), async (c) => {
   const { id } = c.req.param();
-  await sql`UPDATE actividades SET activo = false, actualizado_en = NOW() WHERE id = ${id}`;
+  await sql`UPDATE actividades SET activo = false, updated_at = NOW() WHERE id = ${id}`;
   return c.json({ message: "Actividad desactivada" });
 });
 

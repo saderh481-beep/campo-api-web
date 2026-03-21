@@ -1,766 +1,395 @@
-# API Web - Documentación de Endpoints
+# API Web - Endpoints
 
-Esta API proporciona endpoints para la aplicación web de administración.
+Documentacion actualizada de endpoints expuestos por la API.
 
-## Autenticación
+## Base
 
-Todas las rutas (excepto `/auth/*`) requieren autenticación mediante JWT en cookies:
-```
-Cookie: session=<token>
-```
+- Health: GET /health
+- Prefijos montados:
+  - /auth
+  - /usuarios
+  - /tecnicos
+  - /cadenas-productivas
+  - /actividades
+  - /beneficiarios
+  - /asignaciones
+  - /bitacoras
+  - /reportes
+  - /archive
+  - /notificaciones
+
+## Autenticacion
+
+Todas las rutas protegidas usan header Authorization con esquema Bearer.
+
+Ejemplo:
+
+Authorization: Bearer <token>
+
+El token se valida contra Redis en la clave session:{token}.
+
+## Roles
+
+Roles usados por el backend:
+
+- administrador
+- coordinador
+- tecnico
 
 ## Endpoints
 
-### Auth (`/auth`)
-
-#### POST `/tecnico`
-Envía un código de acceso a un técnico por email.
-
-**Body:**
-```json
-{
-  "email": "string (formato email válido)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Código enviado exitosamente"
-}
-```
-
-### Beneficiarios (`/beneficiarios`)
-
-Todas las rutas requieren autenticación y roles de admin o coordinador.
-
-#### GET `/`
-Obtiene la lista de beneficiarios.
-
-**Query Parameters:**
-- Ninguna (para admin) o filtrado por coordinador (para rol coordinador)
-
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "tecnico_id": "uuid",
-    "nombre": "string",
-    "municipio": "string",
-    "localidad": "string (nullable)",
-    "direccion": "string (nullable)",
-    "cp": "string (nullable)",
-    "telefono_principal": "bytea (nullable)",
-    "telefono_secundario": "bytea (nullable)",
-    "coord_parcela": "point (nullable)",
-    "activo": "boolean",
-    "created_at": "timestamp",
-    "updated_at": "timestamp"
-  }
-]
-```
-
-#### GET `/:id`
-Obtiene un beneficiario específico con sus relaciones.
-
-**Parámetros:**
-- `id`: UUID del beneficiario
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "tecnico_id": "uuid",
-  "nombre": "string",
-  "municipio": "string",
-  "localidad": "string (nullable)",
-  "direccion": "string (nullable)",
-  "cp": "string (nullable)",
-  "telefono_principal": "bytea (nullable)",
-  "telefono_secundario": "bytea (nullable)",
-  "coord_parcela": "point (nullable)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp",
-  "cadenas": [
-    {
-      "id": "uuid",
-      "nombre": "string"
-    }
-  ],
-  "documentos": [
-    {
-      "id": "uuid",
-      "tipo": "string",
-      "url": "string",
-      "nombre_original": "string",
-      "r2_key": "string",
-      "sha256": "string",
-      "bytes": "integer (nullable)",
-      "subido_por": "uuid",
-      "creado_en": "timestamp"
-    }
-  ]
-}
-```
-
-**Errores:**
-- 404: Beneficiario no encontrado
-
-#### POST `/`
-Crea un nuevo beneficiario.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres)",
-  "curp": "string (18 caracteres, opcional)",
-  "municipio": "string (opcional)",
-  "localidad": "string (opcional)",
-  "direccion": "string (opcional)",
-  "cp": "string (opcional)",
-  "telefono_principal": "string (opcional)",
-  "telefono_secundario": "string (opcional)",
-  "coord_parcela": "string (opcional)",
-  "tecnico_id": "uuid"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "curp": "string (nullable)",
-  "municipio": "string (nullable)",
-  "localidad": "string (nullable)",
-  "direccion": "string (nullable)",
-  "cp": "string (nullable)",
-  "telefono_principal": "bytea (nullable)",
-  "telefono_secundario": "bytea (nullable)",
-  "coord_parcela": "point (nullable)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-- 409: Ya existe un beneficiario con esa CURP
-
-#### PATCH `/:id`
-Actualiza un beneficiario existente.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres, opcional)",
-  "curp": "string (18 caracteres, opcional)",
-  "municipio": "string (opcional)",
-  "localidad": "string (opcional)",
-  "direccion": "string (opcional)",
-  "cp": "string (opcional)",
-  "telefono_principal": "string (opcional)",
-  "telefono_secundario": "string (opcional)",
-  "coord_parcela": "string (opcional)",
-  "tecnico_id": "uuid (opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "curp": "string (nullable)",
-  "municipio": "string (nullable)",
-  "localidad": "string (nullable)",
-  "direccion": "string (nullable)",
-  "cp": "string (nullable)",
-  "telefono_principal": "bytea (nullable)",
-  "telefono_secundario": "bytea (nullable)",
-  "coord_parcela": "point (nullable)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-- 404: Beneficiario no encontrado
-- 409: Ya existe un beneficiario con esa CURP
-
-#### POST `/:id/cadenas`
-Asigna cadenas productivas a un beneficiario (solo admin).
-
-**Body:**
-```json
-{
-  "cadena_ids": "uuid[]"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Cadenas actualizadas"
-}
-```
-
-#### POST `/:id/documentos`
-Sube un documento para un beneficiario.
-
-**Body (FormData):**
-- `archivo`: archivo
-- `tipo`: string
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "tipo": "string",
-  "url": "string",
-  "nombre_archivo": "string",
-  "creado_en": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Archivo y tipo son requeridos
-
-#### GET `/:id/documentos`
-Obtiene los documentos de un beneficiario.
-
-**Parámetros:**
-- `id`: UUID del beneficiario
-
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "tipo": "string",
-    "url": "string",
-    "nombre_archivo": "string",
-    "creado_en": "timestamp"
-  }
-]
-```
-
-### Actividades (`/actividades`)
-
-Todas las rutas requieren autenticación y roles de admin o coordinador.
-
-#### GET `/`
-Obtiene la lista de actividades.
-
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "nombre": "string",
-    "descripcion": "string (nullable)",
-    "activo": "boolean",
-    "created_by": "uuid",
-    "created_at": "timestamp",
-    "updated_at": "timestamp"
-  }
-]
-```
-
-#### POST `/`
-Crea una nueva actividad.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres)",
-  "descripcion": "string (opcional)",
-  "created_by": "uuid"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "descripcion": "string (nullable)",
-  "activo": "boolean",
-  "created_by": "uuid",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-
-#### PATCH `/:id`
-Actualiza una actividad existente.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres, opcional)",
-  "descripcion": "string (opcional)",
-  "created_by": "uuid (opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "descripcion": "string (nullable)",
-  "activo": "boolean",
-  "created_by": "uuid",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-- 404: Actividad no encontrada
-
-#### DELETE `/:id`
-Desactiva una actividad (soft delete).
-
-**Parámetros:**
-- `id`: UUID de la actividad
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Actividad desactivada"
-}
-```
-
-### Asignaciones (`/asignaciones`)
-
-Todas las rutas requieren autenticación y rol de admin.
-
-#### POST `/beneficiario`
-Asigna un técnico a un beneficiario.
-
-**Body:**
-```json
-{
-  "tecnico_id": "uuid",
-  "beneficiario_id": "uuid"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "tecnico_id": "uuid",
-  "beneficiario_id": "uuid",
-  "activo": "boolean",
-  "creado_en": "timestamp"
-}
-```
-
-#### DELETE `/beneficiario/:id`
-Elimina la asignación de un técnico a un beneficiario.
-
-**Parámetros:**
-- `id`: UUID de la asignación
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Asignación removida"
-}
-```
-
-#### POST `/actividad`
-Asigna un técnico a una actividad.
-
-**Body:**
-```json
-{
-  "tecnico_id": "uuid",
-  "actividad_id": "uuid"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "tecnico_id": "uuid",
-  "actividad_id": "uuid",
-  "activo": "boolean",
-  "creado_en": "timestamp"
-}
-```
-
-#### DELETE `/actividad/:id`
-Elimina la asignación de un técnico a una actividad.
-
-**Parámetros:**
-- `id`: UUID de la asignación
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Asignación de actividad removida"
-}
-```
-
-### Cadenas (`/cadenas`)
-
-Todas las rutas requieren autenticación y roles de admin o coordinador.
-
-#### GET `/`
-Obtiene la lista de cadenas productivas.
-
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "nombre": "string",
-    "descripcion": "string (nullable)",
-    "activo": "boolean",
-    "created_by": "uuid",
-    "created_at": "timestamp",
-    "updated_at": "timestamp"
-  }
-]
-```
-
-#### POST `/`
-Crea una nueva cadena productiva.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres)",
-  "descripcion": "string (opcional)"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "descripcion": "string (nullable)",
-  "activo": "boolean",
-  "created_by": "uuid",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-
-#### PATCH `/:id`
-Actualiza una cadena productiva existente.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres, opcional)",
-  "descripcion": "string (opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "descripcion": "string (nullable)",
-  "activo": "boolean",
-  "created_by": "uuid",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-- 404: Cadena no encontrada
-
-#### DELETE `/:id`
-Desactiva una cadena productiva (soft delete).
-
-**Parámetros:**
-- `id`: UUID de la cadena
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Cadena desactivada"
-}
-```
-
-### Técnicos (`/tecnicos`)
-
-Todas las rutas requieren autenticación y roles de admin o coordinador.
-
-#### GET `/`
-Obtiene la lista de técnicos.
-
-**Query Parameters:**
-- Ninguna (para admin) o filtrado por coordinador (para rol coordinador)
-
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "coordinador_id": "uuid",
-    "nombre": "string",
-    "correo": "string",
-    "telefono": "string (nullable)",
-    "codigo_acceso": "string (nullable)",
-    "fecha_limite": "timestamp (nullable)",
-    "activo": "boolean",
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "coordinador_nombre": "string (nullable)"
-  }
-]
-```
-
-#### GET `/:id`
-Obtiene un técnico específico con sus asignaciones.
-
-**Parámetros:**
-- `id`: UUID del técnico
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "coordinador_id": "uuid",
-  "nombre": "string",
-  "correo": "string",
-  "telefono": "string (nullable)",
-  "codigo_acceso": "string (nullable)",
-  "fecha_limite": "timestamp (nullable)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp",
-  "asignaciones": [
-    {
-      "id": "uuid",
-      "beneficiario": "string",
-      "activo": "boolean"
-    }
-  ]
-}
-```
-
-**Errores:**
-- 404: Técnico no encontrado
-- 403: Sin permisos (si el coordinador intenta acceder a un técnico de otro coordinador)
-
-#### POST `/`
-Crea un nuevo técnico.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres)",
-  "correo": "string (formato email válido)",
-  "telefono": "string (opcional)",
-  "coordinador_id": "uuid",
-  "fecha_limite": "datetime (opcional)"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "correo": "string",
-  "telefono": "string (nullable)",
-  "fecha_limite": "timestamp (nullable)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-
-#### PATCH `/:id`
-Actualiza un técnico existente.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres, opcional)",
-  "correo": "string (formato email válido, opcional)",
-  "telefono": "string (opcional)",
-  "coordinador_id": "uuid (opcional)",
-  "fecha_limite": "datetime (opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "correo": "string",
-  "telefono": "string (nullable)",
-  "fecha_limite": "timestamp (nullable)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
-- 404: Técnico no encontrado
-
-#### POST `/:id/codigo`
-Genera y envía un código de acceso para un técnico.
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Código generado y enviado",
-  "codigo": "string (5 caracteres)"
-}
-```
-
-#### DELETE `/:id`
-Desactiva un técnico (soft delete).
-
-**Parámetros:**
-- `id`: UUID del técnico
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Técnico desactivado"
-}
-```
-
-### Notificaciones (`/notificaciones`)
-
-Todas las rutas requieren autenticación.
-
-#### GET `/`
-Obtiene las notificaciones no leídas del usuario.
-
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "destino_id": "uuid",
-    "destino_tipo": "string",
-    "tipo": "string",
-    "titulo": "string",
-    "cuerpo": "string",
-    "leido": "boolean",
-    "enviado_push": "boolean",
-    "enviado_email": "boolean",
-    "creado_en": "timestamp"
-  }
-]
-```
-
-#### PATCH `/:id/leer`
-Marca una notificación como leída.
-
-**Parámetros:**
-- `id`: UUID de la notificación
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Marcada como leída"
-}
-```
-
-### Reportes (`/reportes`)
-
-Todas las rutas requieren autenticación.
-
-#### GET `/bitacoras-mensual`
-Obtiene un reporte mensual de bitácoras.
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "mes": "integer",
-  "año": "integer",
-  "total_bitacoras": "integer",
-  "bitacoras_por_estado": {
-    "borrador": "integer",
-    "cerrada": "integer",
-    "cancelada": "integer"
-  },
-  "bitacoras_por_tipo": {
-    "beneficiario": "integer",
-    "actividad": "integer"
-  }
-}
-```
-
-### Usuarios (`/usuarios`)
-
-Todas las rutas requieren autenticación.
-
-#### GET `/perfil`
-Obtiene el perfil del usuario autenticado.
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "correo": "string",
-  "nombre": "string",
-  "rol": "string (admin|coordinador)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-#### PATCH `/perfil`
-Actualiza el perfil del usuario autenticado.
-
-**Body:**
-```json
-{
-  "nombre": "string (mínimo 2 caracteres, opcional)",
-  "correo": "string (formato email válido, opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "correo": "string",
-  "nombre": "string",
-  "rol": "string (admin|coordinador)",
-  "activo": "boolean",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 400: Datos inválidos (validación de esquema)
+## Tabla Rapida
+
+### Auth
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| POST | /auth/request-codigo-acceso | Publico | { correo } |
+| POST | /auth/verify-codigo-acceso | Publico | { correo, codigo_acceso } |
+| POST | /auth/login | Publico | { correo, codigo_acceso } |
+| POST | /auth/request-otp | Publico | { correo } |
+| POST | /auth/verify-otp | Publico | { correo, codigo_acceso } |
+| POST | /auth/logout | Bearer | - |
+
+### Usuarios
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /usuarios | administrador | - |
+| POST | /usuarios | administrador | { correo, nombre, rol } |
+| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol? } |
+| DELETE | /usuarios/:id | administrador | - |
+
+### Tecnicos
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /tecnicos | administrador, coordinador | - |
+| GET | /tecnicos/:id | administrador, coordinador | - |
+| POST | /tecnicos | administrador | { nombre, correo, coordinador_id, fecha_limite } |
+| PATCH | /tecnicos/:id | administrador | { nombre?, correo?, telefono?, coordinador_id?, fecha_limite? } |
+| POST | /tecnicos/:id/codigo | administrador | - |
+| DELETE | /tecnicos/:id | administrador | - |
+
+### Cadenas Productivas
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /cadenas-productivas | administrador, coordinador | - |
+| POST | /cadenas-productivas | administrador | { nombre, descripcion? } |
+| PATCH | /cadenas-productivas/:id | administrador | { nombre?, descripcion? } |
+| DELETE | /cadenas-productivas/:id | administrador | - |
+
+### Actividades
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /actividades | administrador, coordinador | - |
+| POST | /actividades | administrador | { nombre, descripcion? } |
+| PATCH | /actividades/:id | administrador | { nombre?, descripcion?, created_by? } |
+| DELETE | /actividades/:id | administrador | - |
+
+### Beneficiarios
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /beneficiarios | administrador, coordinador | - |
+| GET | /beneficiarios/:id | administrador, coordinador | - |
+| POST | /beneficiarios | administrador, coordinador | { nombre, municipio, tecnico_id } |
+| PATCH | /beneficiarios/:id | administrador, coordinador | { nombre?, municipio?, localidad?, direccion?, cp?, telefono_principal?, telefono_secundario?, coord_parcela?, tecnico_id? } |
+| POST | /beneficiarios/:id/cadenas | administrador | { cadena_ids: uuid[] } |
+| POST | /beneficiarios/:id/documentos | administrador, coordinador | FormData(archivo, tipo) |
+| GET | /beneficiarios/:id/documentos | administrador, coordinador | - |
+
+### Asignaciones
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| POST | /asignaciones/beneficiario | administrador | { tecnico_id, beneficiario_id } |
+| DELETE | /asignaciones/beneficiario/:id | administrador | - |
+| POST | /asignaciones/actividad | administrador | { tecnico_id, actividad_id } |
+| DELETE | /asignaciones/actividad/:id | administrador | - |
+
+### Bitacoras
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /bitacoras | administrador, coordinador | Query opcional: tecnico_id, mes, anio, estado, tipo |
+| GET | /bitacoras/:id | administrador, coordinador | - |
+| PATCH | /bitacoras/:id | administrador, coordinador | { observaciones?, actividades_realizadas? } |
+| GET | /bitacoras/:id/pdf | administrador, coordinador | - |
+| GET | /bitacoras/:id/pdf/descargar | administrador, coordinador | - |
+| POST | /bitacoras/:id/pdf/imprimir | administrador, coordinador | - |
+| GET | /bitacoras/:id/versiones | administrador, coordinador | - |
+
+### Reportes
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /reportes/mensual | administrador, coordinador | Query opcional: mes, anio |
+| GET | /reportes/tecnico/:id | administrador, coordinador | Query opcional: desde, hasta |
+
+### Notificaciones
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /notificaciones | administrador, coordinador | - |
+| PATCH | /notificaciones/:id/leer | administrador, coordinador | - |
+| PATCH | /notificaciones/leer-todas | administrador, coordinador | - |
+
+### Archive
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /archive | administrador | - |
+| GET | /archive/:periodo/descargar | administrador | - |
+| POST | /archive/:periodo/confirmar | administrador | { confirmar: true } |
+| POST | /archive/:periodo/forzar | administrador | - |
+
+### Auth (/auth)
+
+- POST /request-codigo-acceso
+  - Body: { correo }
+  - Nota: endpoint informativo/compatibilidad; ya no genera codigo por correo.
+
+- POST /verify-codigo-acceso
+  - Body: { correo, codigo_acceso }
+  - Login por compatibilidad.
+
+- POST /login
+  - Body: { correo, codigo_acceso }
+  - Busca usuario activo por correo, compara con hash_codigo_acceso (bcrypt), crea token UUID, guarda sesion en Redis y registra auth_logs login.
+  - Respuesta 200:
+    - { token, usuario: { id, nombre, correo, rol } }
+
+- POST /request-otp
+  - Compatibilidad temporal (mismo comportamiento de request-codigo-acceso).
+
+- POST /verify-otp
+  - Compatibilidad temporal (mismo comportamiento de login).
+
+- POST /logout
+  - Requiere Bearer token.
+  - Elimina session:{token} en Redis y registra auth_logs logout.
+
+### Usuarios (/usuarios)
+
+Requiere rol administrador.
+
+- GET /
+  - Lista usuarios.
+
+- POST /
+  - Body:
+    - correo (email)
+    - nombre
+    - rol: tecnico | coordinador | administrador
+  - Crea usuario y genera automaticamente codigo_acceso:
+    - tecnico: 5 digitos
+    - coordinador/administrador: 6 digitos
+  - Guarda codigo_acceso en texto plano y hash_codigo_acceso en bcrypt cost 12.
+  - Respuesta 201 incluye codigo_acceso solo en esta respuesta de creacion.
+
+- PATCH /:id
+  - Body parcial: nombre, correo, rol.
+
+- DELETE /:id
+  - Soft delete: activo=false, updated_at=NOW().
+
+### Tecnicos (/tecnicos)
+
+Requiere autenticacion.
+
+- GET /
+  - Roles: administrador, coordinador.
+  - Admin ve todos los activos; coordinador solo los suyos.
+
+- GET /:id
+  - Roles: administrador, coordinador.
+
+- POST /
+  - Solo administrador.
+  - Body: nombre, correo, telefono?, coordinador_id, fecha_limite.
+
+- PATCH /:id
+  - Solo administrador.
+  - Body parcial: nombre, correo, telefono, coordinador_id, fecha_limite.
+
+- POST /:id/codigo
+  - Solo administrador.
+  - Genera codigo numerico para tecnico, lo guarda en tecnicos.codigo_acceso y en Redis (tech:{codigo}) con TTL hasta fecha_limite.
+
+- DELETE /:id
+  - Solo administrador.
+  - Soft delete: activo=false, updated_at=NOW().
+
+### Cadenas Productivas (/cadenas-productivas)
+
+- GET /
+  - Roles: administrador, coordinador.
+
+- POST /
+  - Solo administrador.
+  - Body: nombre, descripcion?.
+
+- PATCH /:id
+  - Solo administrador.
+  - Body parcial: nombre, descripcion.
+
+- DELETE /:id
+  - Solo administrador.
+  - Soft delete: activo=false, updated_at=NOW().
+
+### Actividades (/actividades)
+
+- GET /
+  - Roles: administrador, coordinador.
+
+- POST /
+  - Solo administrador.
+  - Body: nombre, descripcion?.
+
+- PATCH /:id
+  - Solo administrador.
+  - Body parcial: nombre, descripcion, created_by?.
+
+- DELETE /:id
+  - Solo administrador.
+  - Soft delete: activo=false, updated_at=NOW().
+
+### Beneficiarios (/beneficiarios)
+
+- GET /
+  - Roles: administrador, coordinador.
+
+- GET /:id
+  - Regresa beneficiario con cadenas activas y documentos.
+
+- POST /
+  - Roles: administrador, coordinador.
+  - Body:
+    - nombre
+    - municipio
+    - localidad?
+    - direccion?
+    - cp?
+    - telefono_principal?
+    - telefono_secundario?
+    - coord_parcela? (formato x,y o (x,y))
+    - tecnico_id
+  - telefonos se almacenan como bytea.
+  - coord_parcela se almacena como point.
+
+- PATCH /:id
+  - Roles: administrador, coordinador.
+  - Body parcial de los mismos campos.
+
+- POST /:id/cadenas
+  - Solo administrador.
+  - Body: { cadena_ids: uuid[] }
+  - Actualiza asignaciones usando beneficiario_cadenas.activo (sin delete fisico).
+
+- POST /:id/documentos
+  - Roles: administrador, coordinador.
+  - FormData: archivo, tipo.
+  - Guarda metadata en documentos (r2_key, sha256, bytes, subido_por).
+
+- GET /:id/documentos
+  - Lista documentos del beneficiario.
+
+### Asignaciones (/asignaciones)
+
+Requiere rol administrador.
+
+- POST /beneficiario
+  - Body: { tecnico_id, beneficiario_id }
+  - Crea o reactiva asignacion.
+
+- DELETE /beneficiario/:id
+  - Soft remove: activo=false, removido_en=NOW().
+
+- POST /actividad
+  - Body: { tecnico_id, actividad_id }
+  - Crea o reactiva asignacion.
+
+- DELETE /actividad/:id
+  - Soft remove: activo=false, removido_en=NOW().
+
+### Bitacoras (/bitacoras)
+
+Requiere roles administrador o coordinador.
+
+- GET /
+  - Filtros opcionales: tecnico_id, mes, anio, estado, tipo.
+
+- GET /:id
+
+- PATCH /:id
+  - Body opcional:
+    - observaciones
+    - actividades_realizadas
+  - Persiste en columnas:
+    - observaciones_coordinador
+    - actividades_desc
+
+- GET /:id/pdf
+  - Render inline PDF.
+
+- GET /:id/pdf/descargar
+  - Descarga PDF.
+
+- POST /:id/pdf/imprimir
+  - Genera PDF, lo sube y registra version en pdf_versiones.
+
+- GET /:id/versiones
+  - Lista versiones PDF.
+
+### Reportes (/reportes)
+
+Requiere roles administrador o coordinador.
+
+- GET /mensual
+  - Query opcional: mes, anio.
+  - Respuesta: resumen por tecnico (cerradas, borradores, total).
+
+- GET /tecnico/:id
+  - Query opcional: desde, hasta.
+  - Respuesta: detalle de bitacoras del tecnico.
+
+### Notificaciones (/notificaciones)
+
+Requiere roles administrador o coordinador.
+
+- GET /
+  - Lista no leidas del usuario autenticado.
+
+- PATCH /:id/leer
+  - Marca una notificacion como leida.
+
+- PATCH /leer-todas
+  - Marca todas como leidas para el usuario.
+
+### Archive (/archive)
+
+Requiere rol administrador.
+
+- GET /
+  - Lista registros de archive_logs.
+
+- GET /:periodo/descargar
+  - Descarga el paquete si r2_key_staging contiene URL HTTP(S).
+
+- POST /:periodo/confirmar
+  - Body: { confirmar: true }
+  - Inserta evento de confirmacion en archive_logs (append-only).
+
+- POST /:periodo/forzar
+  - Inserta evento de generacion en archive_logs (append-only).
+
+## Codigos de error comunes
+
+- 400: Request invalido o validacion fallida.
+- 401: No autenticado / token invalido.
+- 403: Sin permisos por rol.
+- 404: Recurso no encontrado.
+- 409: Conflicto de datos (por ejemplo correo duplicado).

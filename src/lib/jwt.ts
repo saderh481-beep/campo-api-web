@@ -5,8 +5,9 @@ const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export type JwtPayload = {
   sub: string;
-  rol: "admin" | "coordinador";
+  rol: "administrador" | "coordinador" | "tecnico";
   nombre: string;
+  correo?: string;
 };
 
 export async function signJwt(payload: JwtPayload): Promise<string> {

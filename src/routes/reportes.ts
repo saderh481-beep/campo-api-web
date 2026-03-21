@@ -1,9 +1,14 @@
 import { Hono } from "hono";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
+import type { JwtPayload } from "@/lib/jwt";
 
-const app = new Hono();
-app.use("*", authMiddleware, requireRole("admin", "coordinador"));
+const app = new Hono<{
+  Variables: {
+    user: JwtPayload;
+  };
+}>();
+app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
 
 app.get("/mensual", async (c) => {
   const user = c.get("user");
@@ -12,7 +17,7 @@ app.get("/mensual", async (c) => {
   const y = anio ? Number(anio) : new Date().getFullYear();
 
   const rows =
-    user.rol === "admin"
+    user.rol === "administrador"
       ? await sql`
           SELECT t.nombre AS tecnico,
                  COUNT(*) FILTER (WHERE b.estado = 'cerrada') AS cerradas,

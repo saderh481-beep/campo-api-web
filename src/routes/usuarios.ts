@@ -1,19 +1,42 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { hash } from "bcryptjs";
+import { randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
+import type { JwtPayload } from "@/lib/jwt";
 
-const app = new Hono();
+const app = new Hono<{
+  Variables: {
+    user: JwtPayload;
+  };
+}>();
 
 app.use("*", authMiddleware);
-app.use("*", requireRole("admin"));
+app.use("*", requireRole("administrador"));
+
+function getCodeLengthByRole(rol: string): number {
+  if (rol === "tecnico") return 5;
+  return 6;
+}
+
+async function generarCodigoAccesoUnico(length: number): Promise<string> {
+  const min = 10 ** (length - 1);
+  const max = 10 ** length;
+
+  while (true) {
+    const candidate = randomInt(min, max).toString();
+    const [exists] = await sql`SELECT id FROM usuarios WHERE codigo_acceso = ${candidate} LIMIT 1`;
+    if (!exists) return candidate;
+  }
+}
 
 app.get("/", async (c) => {
   const usuarios = await sql`
-    SELECT id, nombre, correo, rol, activo, creado_en
+    SELECT id, nombre, correo, rol, activo, created_at, updated_at
     FROM usuarios
-    ORDER BY creado_en DESC
+    ORDER BY created_at DESC
   `;
   return c.json(usuarios);
 });
@@ -25,7 +48,7 @@ app.post(
     z.object({
       correo: z.string().email(),
       nombre: z.string().min(2),
-      rol: z.enum(["admin", "coordinador"]),
+      rol: z.enum(["tecnico", "coordinador", "administrador"]),
     })
   ),
   async (c) => {
@@ -33,12 +56,17 @@ app.post(
     const [existe] = await sql`SELECT id FROM usuarios WHERE correo = ${body.correo}`;
     if (existe) return c.json({ error: "El correo ya está registrado" }, 409);
 
+    const length = getCodeLengthByRole(body.rol);
+    const codigoAcceso = await generarCodigoAccesoUnico(length);
+    const hashCodigoAcceso = await hash(codigoAcceso, 12);
+
     const [nuevo] = await sql`
-      INSERT INTO usuarios (correo, nombre, rol)
-      VALUES (${body.correo}, ${body.nombre}, ${body.rol})
-      RETURNING id, nombre, correo, rol, activo, creado_en
+      INSERT INTO usuarios (correo, nombre, rol, codigo_acceso, hash_codigo_acceso)
+      VALUES (${body.correo}, ${body.nombre}, ${body.rol}, ${codigoAcceso}, ${hashCodigoAcceso})
+      RETURNING id, nombre, correo, rol, activo, created_at, updated_at
     `;
-    return c.json(nuevo, 201);
+
+    return c.json({ ...nuevo, codigo_acceso: codigoAcceso }, 201);
   }
 );
 
@@ -49,7 +77,7 @@ app.patch(
     z.object({
       nombre: z.string().min(2).optional(),
       correo: z.string().email().optional(),
-      rol: z.enum(["admin", "coordinador"]).optional(),
+      rol: z.enum(["tecnico", "coordinador", "administrador"]).optional(),
     })
   ),
   async (c) => {
@@ -72,9 +100,9 @@ app.patch(
         nombre = COALESCE(${body.nombre ?? null}, nombre),
         correo = COALESCE(${body.correo ?? null}, correo),
         rol    = COALESCE(${body.rol ?? null}, rol),
-        actualizado_en = NOW()
+        updated_at = NOW()
       WHERE id = ${id}
-      RETURNING id, nombre, correo, rol, activo
+      RETURNING id, nombre, correo, rol, activo, created_at, updated_at
     `;
     return c.json(actualizado);
   }
@@ -85,7 +113,7 @@ app.delete("/:id", async (c) => {
   const user = c.get("user");
   if (user.sub === id) return c.json({ error: "No puedes desactivar tu propia cuenta" }, 400);
 
-  await sql`UPDATE usuarios SET activo = false, actualizado_en = NOW() WHERE id = ${id}`;
+  await sql`UPDATE usuarios SET activo = false, updated_at = NOW() WHERE id = ${id}`;
   return c.json({ message: "Usuario desactivado" });
 });
 

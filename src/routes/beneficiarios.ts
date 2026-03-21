@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { sql } from "@/db";
 import { subirDocumento } from "@/lib/cloudinary";
 import { authMiddleware, requireRole } from "@/middleware/auth";
@@ -11,12 +12,24 @@ const app = new Hono<{
     user: JwtPayload
   }
 }>();
-app.use("*", authMiddleware, requireRole("admin", "coordinador"));
+app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+
+function encodePhone(value?: string): Buffer | null {
+  if (!value) return null;
+  return Buffer.from(value, "utf8");
+}
+
+function normalizePoint(value?: string): string | null {
+  if (!value) return null;
+  const match = value.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
+  if (!match) return null;
+  return `(${match[1]},${match[2]})`;
+}
 
 app.get("/", async (c) => {
   const user = c.get("user");
   const beneficiarios =
-    user.rol === "admin"
+    user.rol === "administrador"
       ? await sql`
           SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp, 
                  b.telefono_principal, b.telefono_secundario, b.coord_parcela, b.activo, b.created_at, b.updated_at
@@ -43,11 +56,11 @@ app.get("/:id", async (c) => {
   const cadenas = await sql`
     SELECT cp.id, cp.nombre
     FROM beneficiario_cadenas bc
-    JOIN cadenas_productivas cp ON cp.id = bc.cadena_productiva_id
-    WHERE bc.beneficiario_id = ${id}
+    JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
+    WHERE bc.beneficiario_id = ${id} AND bc.activo = true
   `;
   const documentos = await sql`
-    SELECT id, tipo, url, nombre_original, r2_key, sha256, bytes, subido_por, creado_en 
+    SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
     FROM documentos WHERE beneficiario_id = ${id}
   `;
   return c.json({ ...beneficiario, cadenas, documentos });
@@ -59,8 +72,7 @@ app.post(
     "json",
     z.object({
       nombre: z.string().min(2),
-      curp: z.string().length(18).optional(),
-      municipio: z.string().optional(),
+      municipio: z.string().min(1),
       localidad: z.string().optional(),
       direccion: z.string().optional(),
       cp: z.string().optional(),
@@ -73,6 +85,11 @@ app.post(
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
+    const coordParcela = normalizePoint(body.coord_parcela);
+
+    if (body.coord_parcela && !coordParcela) {
+      return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+    }
 
     const [tecnico] = await sql`
       SELECT id, coordinador_id FROM tecnicos
@@ -83,18 +100,13 @@ app.post(
       return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
     }
 
-    if (body.curp) {
-      const [dup] = await sql`SELECT id FROM beneficiarios WHERE curp = ${body.curp}`;
-      if (dup) return c.json({ error: "Ya existe un beneficiario con esa CURP", id: dup.id }, 409);
-    }
-
     const [nuevo] = await sql`
-      INSERT INTO beneficiarios (nombre, curp, municipio, localidad, direccion, cp, 
+      INSERT INTO beneficiarios (nombre, municipio, localidad, direccion, cp,
                                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-      VALUES (${body.nombre}, ${body.curp ?? null}, ${body.municipio ?? null}, ${body.localidad ?? null}, 
-              ${body.direccion ?? null}, ${body.cp ?? null}, ${body.telefono_principal ?? null}, 
-              ${body.telefono_secundario ?? null}, ${body.coord_parcela ?? null}, ${body.tecnico_id})
-      RETURNING id, nombre, curp, municipio, localidad, direccion, cp, 
+      VALUES (${body.nombre}, ${body.municipio}, ${body.localidad ?? null},
+              ${body.direccion ?? null}, ${body.cp ?? null}, ${encodePhone(body.telefono_principal)},
+              ${encodePhone(body.telefono_secundario)}, ${coordParcela}::point, ${body.tecnico_id})
+      RETURNING id, nombre, municipio, localidad, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
     `;
     return c.json(nuevo, 201);
@@ -107,7 +119,6 @@ app.patch(
     "json",
     z.object({
       nombre: z.string().min(2).optional(),
-      curp: z.string().length(18).optional(),
       municipio: z.string().optional(),
       localidad: z.string().optional(),
       direccion: z.string().optional(),
@@ -121,21 +132,26 @@ app.patch(
   async (c) => {
     const { id } = c.req.param();
     const body = c.req.valid("json");
+    const coordParcela = normalizePoint(body.coord_parcela);
+
+    if (body.coord_parcela && !coordParcela) {
+      return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+    }
+
     const [actualizado] = await sql`
       UPDATE beneficiarios SET
         nombre    = COALESCE(${body.nombre ?? null}, nombre),
-        curp      = COALESCE(${body.curp ?? null}, curp),
         municipio = COALESCE(${body.municipio ?? null}, municipio),
         localidad = COALESCE(${body.localidad ?? null}, localidad),
         direccion = COALESCE(${body.direccion ?? null}, direccion),
         cp        = COALESCE(${body.cp ?? null}, cp),
-        telefono_principal = COALESCE(${body.telefono_principal ?? null}, telefono_principal),
-        telefono_secundario = COALESCE(${body.telefono_secundario ?? null}, telefono_secundario),
-        coord_parcela = COALESCE(${body.coord_parcela ?? null}, coord_parcela),
+        telefono_principal = COALESCE(${encodePhone(body.telefono_principal)}, telefono_principal),
+        telefono_secundario = COALESCE(${encodePhone(body.telefono_secundario)}, telefono_secundario),
+        coord_parcela = COALESCE(${coordParcela}::point, coord_parcela),
         tecnico_id  = COALESCE(${body.tecnico_id ?? null}, tecnico_id),
-        actualizado_en = NOW()
+        updated_at = NOW()
       WHERE id = ${id}
-      RETURNING id, nombre, curp, municipio, localidad, direccion, cp, 
+      RETURNING id, nombre, municipio, localidad, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
     `;
     if (!actualizado) return c.json({ error: "Beneficiario no encontrado" }, 404);
@@ -145,18 +161,19 @@ app.patch(
 
 app.post(
   "/:id/cadenas",
-  requireRole("admin"),
+  requireRole("administrador"),
   zValidator("json", z.object({ cadena_ids: z.array(z.string().uuid()) })),
   async (c) => {
     const { id } = c.req.param();
     const { cadena_ids } = c.req.valid("json");
 
-    await sql`DELETE FROM beneficiario_cadenas WHERE beneficiario_id = ${id}`;
+    await sql`UPDATE beneficiario_cadenas SET activo = false WHERE beneficiario_id = ${id}`;
     if (cadena_ids.length > 0) {
       await sql`
-        INSERT INTO beneficiario_cadenas (beneficiario_id, cadena_productiva_id)
-        SELECT ${id}, unnest(${cadena_ids}::uuid[])
-        ON CONFLICT DO NOTHING
+        INSERT INTO beneficiario_cadenas (beneficiario_id, cadena_id, activo, asignado_en)
+        SELECT ${id}, unnest(${cadena_ids}::uuid[]), true, NOW()
+        ON CONFLICT (beneficiario_id, cadena_id)
+        DO UPDATE SET activo = true, asignado_en = NOW()
       `;
     }
     return c.json({ message: "Cadenas actualizadas" });
@@ -165,6 +182,7 @@ app.post(
 
 app.post("/:id/documentos", async (c) => {
   const { id } = c.req.param();
+  const user = c.get("user");
   const formData = await c.req.formData();
   const archivo = formData.get("archivo") as File | null;
   const tipo = formData.get("tipo") as string | null;
@@ -172,13 +190,14 @@ app.post("/:id/documentos", async (c) => {
   if (!archivo || !tipo) return c.json({ error: "Archivo y tipo son requeridos" }, 400);
 
   const buffer = Buffer.from(await archivo.arrayBuffer());
+  const sha256 = createHash("sha256").update(buffer).digest("hex");
   const publicId = `${id}_${Date.now()}`;
   const { secure_url } = await subirDocumento(buffer, `campo/docs/${id}`, publicId);
 
   const [doc] = await sql`
-    INSERT INTO documentos (beneficiario_id, tipo, url, nombre_original)
-    VALUES (${id}, ${tipo}, ${secure_url}, ${archivo.name})
-    RETURNING id, tipo, url, nombre_original, r2_key, sha256, bytes, subido_por, creado_en
+    INSERT INTO documentos (beneficiario_id, tipo, nombre_original, r2_key, sha256, bytes, subido_por)
+    VALUES (${id}, ${tipo}, ${archivo.name}, ${secure_url}, ${sha256}, ${buffer.length}, ${user.sub})
+    RETURNING id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
   `;
   return c.json(doc, 201);
 });
@@ -186,7 +205,7 @@ app.post("/:id/documentos", async (c) => {
 app.get("/:id/documentos", async (c) => {
   const { id } = c.req.param();
   const docs = await sql`
-    SELECT id, tipo, url, nombre_original, r2_key, sha256, bytes, subido_por, creado_en 
+    SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
     FROM documentos WHERE beneficiario_id = ${id}
   `;
   return c.json(docs);
