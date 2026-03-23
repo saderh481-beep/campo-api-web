@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { hash } from "bcryptjs";
 import { randomInt } from "node:crypto";
 import { sql } from "@/db";
-import { redis } from "@/lib/redis";
 import { enviarCodigoTecnico } from "@/lib/mailer";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 
@@ -71,25 +71,14 @@ app.post(
     })
   ),
   async (c) => {
-    const body = c.req.valid("json");
-
-    const [dupCorreo] = await sql`
-      SELECT id FROM tecnicos WHERE correo = ${body.correo} AND activo = true
-    `;
-    if (dupCorreo) return c.json({ error: "Ya existe un técnico activo con ese correo" }, 409);
-
-    const [coordinador] = await sql`
-      SELECT id FROM usuarios
-      WHERE id = ${body.coordinador_id} AND rol = 'coordinador' AND activo = true
-    `;
-    if (!coordinador) return c.json({ error: "Coordinador inválido o inactivo" }, 400);
-
-    const [nuevo] = await sql`
-      INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite)
-      VALUES (${body.nombre}, ${body.correo}, ${body.telefono ?? null}, ${body.coordinador_id}, ${body.fecha_limite})
-      RETURNING id, nombre, correo, telefono, fecha_limite, activo, created_at, updated_at
-    `;
-    return c.json(nuevo, 201);
+    c.req.valid("json");
+    return c.json(
+      {
+        error:
+          "La creación de técnicos se realiza desde /usuarios con rol 'tecnico'.",
+      },
+      409
+    );
   }
 );
 
@@ -133,12 +122,18 @@ app.post("/:id/codigo", requireRole("administrador"), async (c) => {
   if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
 
   const codigo = randomInt(10000, 100000).toString();
+  const hashCodigo = await hash(codigo, 12);
+
+  await sql`
+    UPDATE tecnicos SET codigo_acceso = ${codigo}, updated_at = NOW() WHERE id = ${id}
+  `;
+  await sql`
+    UPDATE usuarios
+    SET codigo_acceso = ${codigo}, hash_codigo_acceso = ${hashCodigo}, updated_at = NOW()
+    WHERE correo = ${tecnico.correo} AND rol = 'tecnico' AND activo = true
+  `;
 
   const fechaLimite = new Date(tecnico.fecha_limite);
-  const ttl = Math.max(1, Math.floor((fechaLimite.getTime() - Date.now()) / 1000));
-
-  await redis.setex(`tech:${codigo}`, ttl, tecnico.id);
-  await sql`UPDATE tecnicos SET codigo_acceso = ${codigo}, updated_at = NOW() WHERE id = ${id}`;
 
   try {
     await enviarCodigoTecnico(tecnico.correo, tecnico.nombre, codigo, fechaLimite);
@@ -152,17 +147,17 @@ app.post("/:id/codigo", requireRole("administrador"), async (c) => {
 app.delete("/:id", requireRole("administrador"), async (c) => {
   const { id } = c.req.param();
   const [tecnico] = await sql`
-    UPDATE tecnicos SET activo = false, updated_at = NOW()
+    UPDATE tecnicos SET activo = false, updated_at = NOW(), codigo_acceso = NULL
     WHERE id = ${id}
-    RETURNING id
+    RETURNING id, correo
   `;
   if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
 
-  const keys = await redis.keys("tech:*");
-  for (const key of keys) {
-    const val = await redis.get(key);
-    if (val === id) await redis.del(key);
-  }
+  await sql`
+    UPDATE usuarios
+    SET activo = false, updated_at = NOW()
+    WHERE correo = ${tecnico.correo} AND rol = 'tecnico'
+  `;
 
   return c.json({ message: "Técnico desactivado" });
 });

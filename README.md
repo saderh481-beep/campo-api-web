@@ -28,6 +28,8 @@ Authorization: Bearer <token>
 
 El token se valida contra Redis en la clave session:{token}.
 
+Nota: Redis se usa para sesiones web. Los codigos de acceso de usuarios/tecnicos se guardan en base de datos (usuarios.codigo_acceso + usuarios.hash_codigo_acceso).
+
 ## Roles
 
 Roles usados por el backend:
@@ -56,8 +58,8 @@ Roles usados por el backend:
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
 | GET | /usuarios | administrador | - |
-| POST | /usuarios | administrador | { correo, nombre, rol } |
-| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol? } |
+| POST | /usuarios | administrador | { correo, nombre, rol, telefono?, coordinador_id?, fecha_limite? } |
+| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol?, codigo_acceso?, telefono?, coordinador_id?, fecha_limite? } |
 | DELETE | /usuarios/:id | administrador | - |
 
 ### Tecnicos
@@ -66,7 +68,7 @@ Roles usados por el backend:
 |---|---|---|---|
 | GET | /tecnicos | administrador, coordinador | - |
 | GET | /tecnicos/:id | administrador, coordinador | - |
-| POST | /tecnicos | administrador | { nombre, correo, coordinador_id, fecha_limite } |
+| POST | /tecnicos | administrador | No disponible (alta via /usuarios con rol tecnico) |
 | PATCH | /tecnicos/:id | administrador | { nombre?, correo?, telefono?, coordinador_id?, fecha_limite? } |
 | POST | /tecnicos/:id/codigo | administrador | - |
 | DELETE | /tecnicos/:id | administrador | - |
@@ -177,21 +179,27 @@ Roles usados por el backend:
 Requiere rol administrador.
 
 - GET /
-  - Lista usuarios.
+  - Lista usuarios (incluye codigo_acceso).
 
 - POST /
   - Body:
     - correo (email)
     - nombre
     - rol: tecnico | coordinador | administrador
+    - telefono? (solo tecnico)
+    - coordinador_id? (requerido si rol=tecnico)
+    - fecha_limite? (requerido si rol=tecnico)
   - Crea usuario y genera automaticamente codigo_acceso:
     - tecnico: 5 digitos
     - coordinador/administrador: 6 digitos
   - Guarda codigo_acceso en texto plano y hash_codigo_acceso en bcrypt cost 12.
-  - Respuesta 201 incluye codigo_acceso solo en esta respuesta de creacion.
+  - Si rol=tecnico, tambien crea/replica el registro en tabla tecnicos.
+  - Respuesta 201 incluye codigo_acceso.
 
 - PATCH /:id
-  - Body parcial: nombre, correo, rol.
+  - Body parcial: nombre, correo, rol, codigo_acceso, telefono, coordinador_id, fecha_limite.
+  - Si se actualiza codigo_acceso, tambien se actualiza hash_codigo_acceso.
+  - Si el usuario es tecnico, sincroniza datos en tabla tecnicos.
 
 - DELETE /:id
   - Soft delete: activo=false, updated_at=NOW().
@@ -209,7 +217,8 @@ Requiere autenticacion.
 
 - POST /
   - Solo administrador.
-  - Body: nombre, correo, telefono?, coordinador_id, fecha_limite.
+  - No disponible para crear tecnicos.
+  - La alta de tecnicos se realiza en /usuarios con rol=tecnico.
 
 - PATCH /:id
   - Solo administrador.
@@ -217,11 +226,14 @@ Requiere autenticacion.
 
 - POST /:id/codigo
   - Solo administrador.
-  - Genera codigo numerico para tecnico, lo guarda en tecnicos.codigo_acceso y en Redis (tech:{codigo}) con TTL hasta fecha_limite.
+  - Genera codigo numerico de 5 digitos para tecnico.
+  - Lo guarda en tecnicos.codigo_acceso y en usuarios.codigo_acceso, actualizando usuarios.hash_codigo_acceso.
+  - No usa Redis para codigos tecnicos.
 
 - DELETE /:id
   - Solo administrador.
-  - Soft delete: activo=false, updated_at=NOW().
+  - Soft delete tecnico: activo=false, updated_at=NOW().
+  - Tambien desactiva el usuario tecnico asociado por correo.
 
 ### Cadenas Productivas (/cadenas-productivas)
 
