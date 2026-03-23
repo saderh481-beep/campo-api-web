@@ -48,11 +48,13 @@ app.post(
 
 app.delete("/beneficiario/:id", async (c) => {
   const { id } = c.req.param();
-  await sql`
+  const [actualizada] = await sql`
     UPDATE asignaciones_beneficiario
     SET activo = false, removido_en = NOW()
     WHERE id = ${id}
+    RETURNING id
   `;
+  if (!actualizada) return c.json({ error: "Asignación no encontrada" }, 404);
   return c.json({ message: "Asignación removida" });
 });
 
@@ -92,11 +94,13 @@ app.post(
 
 app.delete("/actividad/:id", async (c) => {
   const { id } = c.req.param();
-  await sql`
+  const [actualizada] = await sql`
     UPDATE asignaciones_actividad
     SET activo = false, removido_en = NOW()
     WHERE id = ${id}
+    RETURNING id
   `;
+  if (!actualizada) return c.json({ error: "Asignación de actividad no encontrada" }, 404);
   return c.json({ message: "Asignación de actividad removida" });
 });
 

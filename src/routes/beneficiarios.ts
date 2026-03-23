@@ -130,12 +130,24 @@ app.patch(
     })
   ),
   async (c) => {
+    const user = c.get("user");
     const { id } = c.req.param();
     const body = c.req.valid("json");
     const coordParcela = normalizePoint(body.coord_parcela);
 
     if (body.coord_parcela && !coordParcela) {
       return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+    }
+
+    if (body.tecnico_id) {
+      const [tecnico] = await sql`
+        SELECT id, coordinador_id FROM tecnicos
+        WHERE id = ${body.tecnico_id} AND activo = true
+      `;
+      if (!tecnico) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
+      if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+        return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+      }
     }
 
     const [actualizado] = await sql`

@@ -3,14 +3,12 @@
 Documentacion actualizada de endpoints expuestos por la API.
 
 ## Base
-
 - Health: GET /health
 - Prefijos montados:
   - /auth
   - /usuarios
   - /tecnicos
   - /cadenas-productivas
-  - /actividades
   - /beneficiarios
   - /asignaciones
   - /bitacoras
@@ -22,8 +20,6 @@ Documentacion actualizada de endpoints expuestos por la API.
 
 Todas las rutas protegidas usan header Authorization con esquema Bearer.
 
-Ejemplo:
-
 Authorization: Bearer <token>
 
 El token se valida contra Redis en la clave session:{token}.
@@ -33,7 +29,6 @@ Nota: Redis se usa para sesiones web. Los codigos de acceso de usuarios/tecnicos
 ## Roles
 
 Roles usados por el backend:
-
 - administrador
 - coordinador
 - tecnico
@@ -193,16 +188,20 @@ Requiere rol administrador.
     - tecnico: 5 digitos
     - coordinador/administrador: 6 digitos
   - Guarda codigo_acceso en texto plano y hash_codigo_acceso en bcrypt cost 12.
-  - Si rol=tecnico, tambien crea/replica el registro en tabla tecnicos.
+  - Si rol=tecnico, tambien crea/replica el registro en tabla tecnicos con activo=true (visible en GET /tecnicos).
   - Respuesta 201 incluye codigo_acceso.
 
 - PATCH /:id
   - Body parcial: nombre, correo, rol, codigo_acceso, telefono, coordinador_id, fecha_limite.
   - Si se actualiza codigo_acceso, tambien se actualiza hash_codigo_acceso.
+  - Valida correo unico entre usuarios activos.
+  - Si rol final es tecnico y se envia coordinador_id, valida que el coordinador exista y este activo.
   - Si el usuario es tecnico, sincroniza datos en tabla tecnicos.
 
 - DELETE /:id
   - Soft delete: activo=false, updated_at=NOW().
+  - Retorna 404 si el usuario no existe.
+  - Si el usuario tiene rol=tecnico, tambien desactiva el registro en tabla tecnicos.
 
 ### Tecnicos (/tecnicos)
 
@@ -223,6 +222,9 @@ Requiere autenticacion.
 - PATCH /:id
   - Solo administrador.
   - Body parcial: nombre, correo, telefono, coordinador_id, fecha_limite.
+  - Valida correo unico contra usuarios activos.
+  - Si cambia coordinador_id, valida que sea un coordinador activo.
+  - Sincroniza nombre/correo en la tabla usuarios para mantener consistencia.
 
 - POST /:id/codigo
   - Solo administrador.
@@ -234,6 +236,7 @@ Requiere autenticacion.
   - Solo administrador.
   - Soft delete tecnico: activo=false, updated_at=NOW().
   - Tambien desactiva el usuario tecnico asociado por correo.
+  - Retorna 404 si el técnico no existe.
 
 ### Cadenas Productivas (/cadenas-productivas)
 
@@ -251,6 +254,7 @@ Requiere autenticacion.
 - DELETE /:id
   - Solo administrador.
   - Soft delete: activo=false, updated_at=NOW().
+  - Retorna 404 si la cadena no existe.
 
 ### Actividades (/actividades)
 
@@ -268,6 +272,7 @@ Requiere autenticacion.
 - DELETE /:id
   - Solo administrador.
   - Soft delete: activo=false, updated_at=NOW().
+  - Retorna 404 si la actividad no existe.
 
 ### Beneficiarios (/beneficiarios)
 
@@ -295,6 +300,8 @@ Requiere autenticacion.
 - PATCH /:id
   - Roles: administrador, coordinador.
   - Body parcial de los mismos campos.
+  - Si se envía tecnico_id, valida que el técnico exista y esté activo.
+  - Coordinador solo puede asignar técnicos bajo su coordinación.
 
 - POST /:id/cadenas
   - Solo administrador.
@@ -319,6 +326,7 @@ Requiere rol administrador.
 
 - DELETE /beneficiario/:id
   - Soft remove: activo=false, removido_en=NOW().
+  - Retorna 404 si la asignación no existe.
 
 - POST /actividad
   - Body: { tecnico_id, actividad_id }
@@ -326,6 +334,7 @@ Requiere rol administrador.
 
 - DELETE /actividad/:id
   - Soft remove: activo=false, removido_en=NOW().
+  - Retorna 404 si la asignación no existe.
 
 ### Bitacoras (/bitacoras)
 
@@ -367,6 +376,8 @@ Requiere roles administrador o coordinador.
 - GET /tecnico/:id
   - Query opcional: desde, hasta.
   - Respuesta: detalle de bitacoras del tecnico.
+  - Coordinador solo puede consultar técnicos bajo su coordinación.
+  - Retorna 404 si el técnico no existe o no tiene permisos.
 
 ### Notificaciones (/notificaciones)
 

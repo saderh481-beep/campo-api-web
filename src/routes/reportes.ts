@@ -47,8 +47,18 @@ app.get("/mensual", async (c) => {
 });
 
 app.get("/tecnico/:id", async (c) => {
+  const user = c.get("user");
   const { id } = c.req.param();
   const { desde, hasta } = c.req.query();
+
+  const [tecnico] =
+    user.rol === "administrador"
+      ? await sql`SELECT id FROM tecnicos WHERE id = ${id} AND activo = true`
+      : await sql`
+          SELECT id FROM tecnicos
+          WHERE id = ${id} AND coordinador_id = ${user.sub} AND activo = true
+        `;
+  if (!tecnico) return c.json({ error: "Técnico no encontrado o sin permisos" }, 404);
 
   const bitacoras = await sql`
     SELECT b.id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin,

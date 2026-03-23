@@ -93,14 +93,15 @@ app.post(
 
     if (body.rol === "tecnico") {
       await sql`
-        INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite, codigo_acceso)
+        INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite, codigo_acceso, activo)
         VALUES (
           ${body.nombre},
           ${body.correo},
           ${body.telefono ?? null},
           ${body.coordinador_id!},
           ${body.fecha_limite!},
-          ${codigoAcceso}
+          ${codigoAcceso},
+          true
         )
       `;
     }
@@ -226,14 +227,15 @@ app.patch(
         `;
       } else {
         await sql`
-          INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite, codigo_acceso)
+          INSERT INTO tecnicos (nombre, correo, telefono, coordinador_id, fecha_limite, codigo_acceso, activo)
           VALUES (
             ${nombreFinal},
             ${correoFinal},
             ${body.telefono ?? null},
-            ${body.coordinador_id},
-            ${body.fecha_limite},
-            ${codigoAccesoFinal}
+            ${body.coordinador_id!},
+            ${body.fecha_limite!},
+            ${codigoAccesoFinal},
+            true
           )
         `;
       }
@@ -254,7 +256,20 @@ app.delete("/:id", async (c) => {
   const user = c.get("user");
   if (user.sub === id) return c.json({ error: "No puedes desactivar tu propia cuenta" }, 400);
 
-  await sql`UPDATE usuarios SET activo = false, updated_at = NOW() WHERE id = ${id}`;
+  const [usuario] = await sql`
+    UPDATE usuarios SET activo = false, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id, nombre, correo, rol
+  `;
+  if (!usuario) return c.json({ error: "Usuario no encontrado" }, 404);
+
+  if (usuario.rol === "tecnico") {
+    await sql`
+      UPDATE tecnicos SET activo = false, updated_at = NOW()
+      WHERE correo = ${usuario.correo}
+    `;
+  }
+
   return c.json({ message: "Usuario desactivado" });
 });
 

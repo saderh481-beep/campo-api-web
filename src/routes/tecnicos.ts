@@ -98,6 +98,29 @@ app.patch(
   async (c) => {
     const { id } = c.req.param();
     const body = c.req.valid("json");
+
+    const [tecnicoActual] = await sql`
+      SELECT id, correo FROM tecnicos
+      WHERE id = ${id} AND activo = true
+    `;
+    if (!tecnicoActual) return c.json({ error: "Técnico no encontrado" }, 404);
+
+    if (body.correo) {
+      const [dupUsuario] = await sql`
+        SELECT id FROM usuarios
+        WHERE correo = ${body.correo} AND correo <> ${tecnicoActual.correo} AND activo = true
+      `;
+      if (dupUsuario) return c.json({ error: "El correo ya está registrado" }, 409);
+    }
+
+    if (body.coordinador_id) {
+      const [coordinador] = await sql`
+        SELECT id FROM usuarios
+        WHERE id = ${body.coordinador_id} AND rol = 'coordinador' AND activo = true
+      `;
+      if (!coordinador) return c.json({ error: "Coordinador inválido o inactivo" }, 400);
+    }
+
     const [actualizado] = await sql`
       UPDATE tecnicos SET
         nombre        = COALESCE(${body.nombre ?? null}, nombre),
@@ -109,7 +132,15 @@ app.patch(
       WHERE id = ${id}
       RETURNING id, nombre, correo, telefono, fecha_limite, activo, created_at, updated_at
     `;
-    if (!actualizado) return c.json({ error: "Técnico no encontrado" }, 404);
+
+    await sql`
+      UPDATE usuarios SET
+        nombre = COALESCE(${body.nombre ?? null}, nombre),
+        correo = COALESCE(${body.correo ?? null}, correo),
+        updated_at = NOW()
+      WHERE correo = ${tecnicoActual.correo} AND rol = 'tecnico'
+    `;
+
     return c.json(actualizado);
   }
 );

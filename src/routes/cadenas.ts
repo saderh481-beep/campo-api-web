@@ -55,7 +55,11 @@ app.patch(
 
 app.delete("/:id", requireRole("administrador"), async (c) => {
   const { id } = c.req.param();
-  await sql`UPDATE cadenas_productivas SET activo = false, updated_at = NOW() WHERE id = ${id}`;
+  const [actualizada] = await sql`
+    UPDATE cadenas_productivas SET activo = false, updated_at = NOW() WHERE id = ${id}
+    RETURNING id
+  `;
+  if (!actualizada) return c.json({ error: "Cadena no encontrada" }, 404);
   return c.json({ message: "Cadena desactivada" });
 });
 
