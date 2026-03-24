@@ -121,16 +121,20 @@ app.patch(
       if (!coordinador) return c.json({ error: "Coordinador inválido o inactivo" }, 400);
     }
 
+    const resetEstado =
+      body.fecha_limite != null && new Date(body.fecha_limite) > new Date();
+
     const [actualizado] = await sql`
       UPDATE tecnicos SET
-        nombre        = COALESCE(${body.nombre ?? null}, nombre),
-        correo        = COALESCE(${body.correo ?? null}, correo),
-        telefono      = COALESCE(${body.telefono ?? null}, telefono),
+        nombre         = COALESCE(${body.nombre ?? null}, nombre),
+        correo         = COALESCE(${body.correo ?? null}, correo),
+        telefono       = COALESCE(${body.telefono ?? null}, telefono),
         coordinador_id = COALESCE(${body.coordinador_id ?? null}, coordinador_id),
-        fecha_limite  = COALESCE(${body.fecha_limite ?? null}, fecha_limite),
-        updated_at = NOW()
+        fecha_limite   = COALESCE(${body.fecha_limite ?? null}, fecha_limite),
+        estado_corte   = CASE WHEN ${resetEstado} THEN 'en_servicio' ELSE estado_corte END,
+        updated_at     = NOW()
       WHERE id = ${id}
-      RETURNING id, nombre, correo, telefono, fecha_limite, activo, created_at, updated_at
+      RETURNING id, nombre, correo, telefono, fecha_limite, estado_corte, activo, created_at, updated_at
     `;
 
     await sql`
@@ -174,6 +178,52 @@ app.post("/:id/codigo", requireRole("administrador"), async (c) => {
 
   return c.json({ message: "Código generado y enviado", codigo });
 });
+
+// POST /aplicar-cortes — batch: aplica estado_corte a todos los vencidos (solo admin)
+app.post("/aplicar-cortes", requireRole("administrador"), async (c) => {
+  const resultado = await sql`
+    UPDATE tecnicos
+    SET estado_corte = 'corte_aplicado',
+        updated_at   = NOW()
+    WHERE fecha_limite IS NOT NULL
+      AND fecha_limite < NOW()
+      AND estado_corte = 'en_servicio'
+      AND activo = true
+    RETURNING id, nombre, correo, fecha_limite
+  `;
+  return c.json({
+    message: `Corte aplicado a ${resultado.length} técnico(s)`,
+    tecnicos: resultado,
+  });
+});
+
+// POST /:id/cerrar-corte — cierre manual por coordinador o admin
+app.post(
+  "/:id/cerrar-corte",
+  requireRole("administrador", "coordinador"),
+  async (c) => {
+    const { id } = c.req.param();
+    const user = c.get("user");
+
+    const [tecnico] = await sql`
+      SELECT id, coordinador_id FROM tecnicos WHERE id = ${id} AND activo = true
+    `;
+    if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
+
+    if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+      return c.json({ error: "Sin permisos sobre este técnico" }, 403);
+    }
+
+    const [actualizado] = await sql`
+      UPDATE tecnicos
+      SET estado_corte = 'corte_aplicado',
+          updated_at   = NOW()
+      WHERE id = ${id}
+      RETURNING id, nombre, estado_corte, fecha_limite
+    `;
+    return c.json({ message: "Período cerrado", tecnico: actualizado });
+  }
+);
 
 app.delete("/:id", requireRole("administrador"), async (c) => {
   const { id } = c.req.param();

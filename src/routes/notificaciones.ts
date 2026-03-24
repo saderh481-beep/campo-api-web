@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { sql } from "@/db";
-import { authMiddleware, requireRole } from "@/middleware/auth";
+import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
 
 const app = new Hono<{
@@ -8,7 +8,7 @@ const app = new Hono<{
     user: JwtPayload;
   };
 }>();
-app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+app.use("*", authMiddleware);
 
 app.get("/", async (c) => {
   const user = c.get("user");

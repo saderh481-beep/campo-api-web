@@ -14,6 +14,9 @@ import bitacorasRoutes from "@/routes/bitacoras";
 import reportesRoutes from "@/routes/reportes";
 import archiveRoutes from "@/routes/archive";
 import notificacionesRoutes from "@/routes/notificaciones";
+import localidadesRoutes from "@/routes/localidades";
+import configuracionesRoutes from "@/routes/configuraciones";
+import documentosPlantillaRoutes from "@/routes/documentos-plantilla";
 
 const app = new Hono();
 
@@ -42,6 +45,9 @@ app.route("/bitacoras", bitacorasRoutes);
 app.route("/reportes", reportesRoutes);
 app.route("/archive", archiveRoutes);
 app.route("/notificaciones", notificacionesRoutes);
+app.route("/localidades", localidadesRoutes);
+app.route("/configuraciones", configuracionesRoutes);
+app.route("/documentos-plantilla", documentosPlantillaRoutes);
 
 app.notFound((c) => c.json({ error: "Ruta no encontrada" }, 404));
 app.onError((err, c) => {

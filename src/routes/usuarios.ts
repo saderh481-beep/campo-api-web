@@ -187,7 +187,7 @@ app.patch(
       }
     }
 
-    const codigoAccesoFinal = body.codigo_acceso ?? usuario.codigo_acceso;
+    const codigoAccesoFinal = body.codigo_acceso ?? null;
     const hashCodigoAccesoFinal = codigoAccesoFinal
       ? await hash(codigoAccesoFinal, 12)
       : null;

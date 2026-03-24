@@ -6,6 +6,7 @@ import { sql } from "@/db";
 import { subirPDF } from "@/lib/cloudinary";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { generarPdfBitacora } from "@/lib/pdf";
+import type { PdfConfig } from "@/lib/pdf";
 import type { JwtPayload } from "@/lib/jwt";
 
 const app = new Hono<{
@@ -118,13 +119,21 @@ async function obtenerBitacoraConAcceso(id: string, userId: string, rol: string)
       )[0];
 }
 
+async function cargarPdfConfig(): Promise<PdfConfig> {
+  const [row] = await sql`
+    SELECT valor FROM configuraciones WHERE clave = 'pdf_encabezado'
+  `;
+  return (row?.valor ?? {}) as PdfConfig;
+}
+
 app.get("/:id/pdf", async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const pdfBytes = await generarPdfBitacora(bitacora);
+  const pdfConfig = await cargarPdfConfig();
+  const pdfBytes = await generarPdfBitacora(bitacora, {}, pdfConfig);
   return new Response(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
@@ -139,7 +148,8 @@ app.get("/:id/pdf/descargar", async (c) => {
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const pdfBytes = await generarPdfBitacora(bitacora);
+  const pdfConfig = await cargarPdfConfig();
+  const pdfBytes = await generarPdfBitacora(bitacora, {}, pdfConfig);
   return new Response(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
@@ -154,7 +164,8 @@ app.post("/:id/pdf/imprimir", async (c) => {
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const pdfBytes = await generarPdfBitacora(bitacora, { impresion: true });
+  const pdfConfig = await cargarPdfConfig();
+  const pdfBytes = await generarPdfBitacora(bitacora, { impresion: true }, pdfConfig);
 
   const buffer = Buffer.from(pdfBytes);
   const sha256 = createHash("sha256").update(buffer).digest("hex");

@@ -31,14 +31,16 @@ app.get("/", async (c) => {
   const beneficiarios =
     user.rol === "administrador"
       ? await sql`
-          SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp, 
-                 b.telefono_principal, b.telefono_secundario, b.coord_parcela, b.activo, b.created_at, b.updated_at
+          SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
+                 b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
+                 b.coord_parcela, b.activo, b.created_at, b.updated_at
           FROM beneficiarios b
           ORDER BY b.nombre
         `
       : await sql`
-          SELECT DISTINCT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp, 
-                         b.telefono_principal, b.telefono_secundario, b.coord_parcela, b.activo, b.created_at, b.updated_at
+          SELECT DISTINCT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
+                         b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
+                         b.coord_parcela, b.activo, b.created_at, b.updated_at
           FROM beneficiarios b
           JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
           JOIN tecnicos t ON t.id = ab.tecnico_id
@@ -74,6 +76,7 @@ app.post(
       nombre: z.string().min(2),
       municipio: z.string().min(1),
       localidad: z.string().optional(),
+      localidad_id: z.string().uuid().optional(),
       direccion: z.string().optional(),
       cp: z.string().optional(),
       telefono_principal: z.string().optional(),
@@ -101,12 +104,13 @@ app.post(
     }
 
     const [nuevo] = await sql`
-      INSERT INTO beneficiarios (nombre, municipio, localidad, direccion, cp,
+      INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
                                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
       VALUES (${body.nombre}, ${body.municipio}, ${body.localidad ?? null},
-              ${body.direccion ?? null}, ${body.cp ?? null}, ${encodePhone(body.telefono_principal)},
+              ${body.localidad_id ?? null}, ${body.direccion ?? null}, ${body.cp ?? null},
+              ${encodePhone(body.telefono_principal)},
               ${encodePhone(body.telefono_secundario)}, ${coordParcela}::point, ${body.tecnico_id})
-      RETURNING id, nombre, municipio, localidad, direccion, cp,
+      RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
     `;
     return c.json(nuevo, 201);
@@ -121,6 +125,7 @@ app.patch(
       nombre: z.string().min(2).optional(),
       municipio: z.string().optional(),
       localidad: z.string().optional(),
+      localidad_id: z.string().uuid().optional(),
       direccion: z.string().optional(),
       cp: z.string().optional(),
       telefono_principal: z.string().optional(),
@@ -152,18 +157,19 @@ app.patch(
 
     const [actualizado] = await sql`
       UPDATE beneficiarios SET
-        nombre    = COALESCE(${body.nombre ?? null}, nombre),
-        municipio = COALESCE(${body.municipio ?? null}, municipio),
-        localidad = COALESCE(${body.localidad ?? null}, localidad),
-        direccion = COALESCE(${body.direccion ?? null}, direccion),
-        cp        = COALESCE(${body.cp ?? null}, cp),
-        telefono_principal = COALESCE(${encodePhone(body.telefono_principal)}, telefono_principal),
+        nombre      = COALESCE(${body.nombre ?? null}, nombre),
+        municipio   = COALESCE(${body.municipio ?? null}, municipio),
+        localidad   = COALESCE(${body.localidad ?? null}, localidad),
+        localidad_id = COALESCE(${body.localidad_id ?? null}, localidad_id),
+        direccion   = COALESCE(${body.direccion ?? null}, direccion),
+        cp          = COALESCE(${body.cp ?? null}, cp),
+        telefono_principal  = COALESCE(${encodePhone(body.telefono_principal)}, telefono_principal),
         telefono_secundario = COALESCE(${encodePhone(body.telefono_secundario)}, telefono_secundario),
         coord_parcela = COALESCE(${coordParcela}::point, coord_parcela),
         tecnico_id  = COALESCE(${body.tecnico_id ?? null}, tecnico_id),
-        updated_at = NOW()
+        updated_at  = NOW()
       WHERE id = ${id}
-      RETURNING id, nombre, municipio, localidad, direccion, cp,
+      RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
     `;
     if (!actualizado) return c.json({ error: "Beneficiario no encontrado" }, 404);

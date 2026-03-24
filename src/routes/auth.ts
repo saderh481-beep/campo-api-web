@@ -43,6 +43,36 @@ async function login(c: any) {
     return c.json({ error: "Credenciales invalidas" }, 401);
   }
 
+  // Verificar vigencia del período para técnicos
+  let tecnicoFechaLimite: string | null = null;
+  if (usuario.rol === "tecnico") {
+    const [tecnico] = await sql`
+      SELECT fecha_limite, estado_corte
+      FROM tecnicos
+      WHERE correo = ${correo} AND activo = true
+    `;
+    if (!tecnico) return c.json({ error: "Credenciales invalidas" }, 401);
+
+    const vencido =
+      tecnico.estado_corte === "corte_aplicado" ||
+      (tecnico.fecha_limite && new Date(tecnico.fecha_limite) < new Date());
+
+    if (vencido) {
+      if (tecnico.estado_corte !== "corte_aplicado") {
+        await sql`
+          UPDATE tecnicos
+          SET estado_corte = 'corte_aplicado', updated_at = NOW()
+          WHERE correo = ${correo} AND activo = true
+        `;
+      }
+      return c.json(
+        { error: "periodo_vencido", message: "Tu período de acceso ha concluido. Contacta a tu coordinador." },
+        401
+      );
+    }
+    tecnicoFechaLimite = tecnico.fecha_limite;
+  }
+
   const token = randomUUID();
   const createdAt = new Date().toISOString();
   const sessionPayload = {
@@ -51,6 +81,7 @@ async function login(c: any) {
     nombre: usuario.nombre,
     correo: usuario.correo,
     created_at: createdAt,
+    ...(tecnicoFechaLimite ? { fecha_limite: tecnicoFechaLimite } : {}),
   };
 
   await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionPayload));

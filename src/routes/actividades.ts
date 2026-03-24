@@ -40,7 +40,7 @@ app.patch(
   requireRole("administrador"),
   zValidator(
     "json",
-    z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional(), created_by: z.string().uuid().optional() })
+    z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional() })
   ),
   async (c) => {
     const { id } = c.req.param();
@@ -49,7 +49,6 @@ app.patch(
       UPDATE actividades SET
         nombre      = COALESCE(${body.nombre ?? null}, nombre),
         descripcion = COALESCE(${body.descripcion ?? null}, descripcion),
-        created_by  = COALESCE(${body.created_by ?? null}, created_by),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at

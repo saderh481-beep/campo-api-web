@@ -2,10 +2,17 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 type Bitacora = Record<string, unknown>;
 type PdfOptions = { impresion?: boolean };
+export type PdfConfig = {
+  institucion?: string | null;
+  dependencia?: string | null;
+  logo_url?: string | null;
+  pie_pagina?: string | null;
+};
 
 export async function generarPdfBitacora(
   bitacora: Bitacora,
-  options: PdfOptions = {}
+  options: PdfOptions = {},
+  config: PdfConfig = {}
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const margin = options.impresion ? 30 : 50;
@@ -17,13 +24,41 @@ export async function generarPdfBitacora(
 
   let y = height - margin;
 
-  page.drawText("SECRETARÍA DE AGRICULTURA Y DESARROLLO RURAL · HIDALGO", {
+  const institucion =
+    config.institucion ?? "SECRETARÍA DE AGRICULTURA Y DESARROLLO RURAL · HIDALGO";
+
+  // Logo (opcional)
+  if (config.logo_url) {
+    try {
+      const res = await fetch(config.logo_url);
+      const imgBytes = await res.arrayBuffer();
+      const logo = await pdfDoc
+        .embedPng(imgBytes)
+        .catch(() => pdfDoc.embedJpg(imgBytes));
+      page.drawImage(logo, { x: width - margin - 60, y: y - 40, width: 55, height: 55 });
+    } catch {
+      // logo no disponible
+    }
+  }
+
+  page.drawText(institucion, {
     x: margin,
     y,
     size: 9,
     font: fontRegular,
     color: rgb(0.4, 0.4, 0.4),
   });
+
+  if (config.dependencia) {
+    y -= 13;
+    page.drawText(config.dependencia, {
+      x: margin,
+      y,
+      size: 9,
+      font: fontRegular,
+      color: rgb(0.4, 0.4, 0.4),
+    });
+  }
 
   y -= 20;
   page.drawText("BITÁCORA DE CAMPO", {
@@ -69,6 +104,23 @@ export async function generarPdfBitacora(
     } catch {
       // foto no disponible
     }
+  }
+
+  // Pie de página
+  if (config.pie_pagina) {
+    page.drawLine({
+      start: { x: margin, y: margin + 20 },
+      end: { x: width - margin, y: margin + 20 },
+      thickness: 0.5,
+      color: rgb(0.7, 0.7, 0.7),
+    });
+    page.drawText(config.pie_pagina, {
+      x: margin,
+      y: margin + 6,
+      size: 8,
+      font: fontRegular,
+      color: rgb(0.5, 0.5, 0.5),
+    });
   }
 
   return pdfDoc.save();

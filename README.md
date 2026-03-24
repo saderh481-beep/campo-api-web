@@ -9,12 +9,16 @@ Documentacion actualizada de endpoints expuestos por la API.
   - /usuarios
   - /tecnicos
   - /cadenas-productivas
+  - /actividades
   - /beneficiarios
   - /asignaciones
   - /bitacoras
   - /reportes
   - /archive
   - /notificaciones
+  - /localidades
+  - /configuraciones
+  - /documentos-plantilla
 
 ## Autenticacion
 
@@ -32,6 +36,31 @@ Roles usados por el backend:
 - administrador
 - coordinador
 - tecnico
+
+## Estado de corte (tecnicos)
+
+Los tecnicos tienen un campo `estado_corte` con tres valores posibles:
+- `en_servicio` — activo, puede iniciar sesion.
+- `corte_aplicado` — periodo vencido, bloqueado en login y en cada request.
+- `baja` — dado de baja definitiva.
+
+Logica de bloqueo:
+- En cada request: el middleware verifica que `fecha_limite` de la sesion no haya expirado. Si expiro devuelve `401 { error: "periodo_vencido" }`.
+- En login: si `fecha_limite < NOW()` se actualiza `estado_corte = corte_aplicado` y se rechaza con `401 { error: "periodo_vencido" }`.
+- Extension de periodo: hacer PATCH `/tecnicos/:id` con `fecha_limite` futura resetea automaticamente `estado_corte = en_servicio`.
+
+## Scripts de utilidad
+
+```bash
+# Aplicar migraciones pendientes a la base de datos
+bun run migrate
+
+# Inspeccionar estructura actual de todas las tablas en la BD
+bun run schema
+
+# Verificar tipos TypeScript sin compilar
+bun run typecheck
+```
 
 ## Endpoints
 
@@ -66,6 +95,8 @@ Roles usados por el backend:
 | POST | /tecnicos | administrador | No disponible (alta via /usuarios con rol tecnico) |
 | PATCH | /tecnicos/:id | administrador | { nombre?, correo?, telefono?, coordinador_id?, fecha_limite? } |
 | POST | /tecnicos/:id/codigo | administrador | - |
+| POST | /tecnicos/aplicar-cortes | administrador | - |
+| POST | /tecnicos/:id/cerrar-corte | administrador, coordinador | - |
 | DELETE | /tecnicos/:id | administrador | - |
 
 ### Cadenas Productivas
@@ -83,7 +114,7 @@ Roles usados por el backend:
 |---|---|---|---|
 | GET | /actividades | administrador, coordinador | - |
 | POST | /actividades | administrador | { nombre, descripcion? } |
-| PATCH | /actividades/:id | administrador | { nombre?, descripcion?, created_by? } |
+| PATCH | /actividades/:id | administrador | { nombre?, descripcion? } |
 | DELETE | /actividades/:id | administrador | - |
 
 ### Beneficiarios
@@ -92,8 +123,8 @@ Roles usados por el backend:
 |---|---|---|---|
 | GET | /beneficiarios | administrador, coordinador | - |
 | GET | /beneficiarios/:id | administrador, coordinador | - |
-| POST | /beneficiarios | administrador, coordinador | { nombre, municipio, tecnico_id } |
-| PATCH | /beneficiarios/:id | administrador, coordinador | { nombre?, municipio?, localidad?, direccion?, cp?, telefono_principal?, telefono_secundario?, coord_parcela?, tecnico_id? } |
+| POST | /beneficiarios | administrador, coordinador | { nombre, municipio, tecnico_id, localidad_id? } |
+| PATCH | /beneficiarios/:id | administrador, coordinador | { nombre?, municipio?, localidad?, localidad_id?, direccion?, cp?, telefono_principal?, telefono_secundario?, coord_parcela?, tecnico_id? } |
 | POST | /beneficiarios/:id/cadenas | administrador | { cadena_ids: uuid[] } |
 | POST | /beneficiarios/:id/documentos | administrador, coordinador | FormData(archivo, tipo) |
 | GET | /beneficiarios/:id/documentos | administrador, coordinador | - |
@@ -130,9 +161,36 @@ Roles usados por el backend:
 
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
-| GET | /notificaciones | administrador, coordinador | - |
-| PATCH | /notificaciones/:id/leer | administrador, coordinador | - |
-| PATCH | /notificaciones/leer-todas | administrador, coordinador | - |
+| GET | /notificaciones | todos (autenticado) | - |
+| PATCH | /notificaciones/:id/leer | todos (autenticado) | - |
+| PATCH | /notificaciones/leer-todas | todos (autenticado) | - |
+
+### Localidades
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /localidades | administrador, coordinador | - |
+| POST | /localidades | administrador | { municipio, nombre, cp? } |
+| PATCH | /localidades/:id | administrador | { municipio?, nombre?, cp? } |
+| DELETE | /localidades/:id | administrador | - |
+
+### Configuraciones
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /configuraciones | administrador | - |
+| GET | /configuraciones/:clave | administrador, coordinador | - |
+| PUT | /configuraciones/:clave | administrador | { valor: object } |
+
+### Documentos Plantilla
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /documentos-plantilla/activos | administrador, coordinador | - |
+| GET | /documentos-plantilla | administrador | - |
+| POST | /documentos-plantilla | administrador | { nombre, descripcion?, obligatorio?, orden? } |
+| PATCH | /documentos-plantilla/:id | administrador | { nombre?, descripcion?, obligatorio?, orden?, activo? } |
+| DELETE | /documentos-plantilla/:id | administrador | - |
 
 ### Archive
 
@@ -225,6 +283,17 @@ Requiere autenticacion.
   - Valida correo unico contra usuarios activos.
   - Si cambia coordinador_id, valida que sea un coordinador activo.
   - Sincroniza nombre/correo en la tabla usuarios para mantener consistencia.
+  - Si fecha_limite es una fecha futura, resetea estado_corte a en_servicio automaticamente.
+
+- POST /aplicar-cortes
+  - Solo administrador.
+  - Aplica estado_corte=corte_aplicado a todos los tecnicos con fecha_limite vencida y estado en_servicio.
+  - Respuesta: lista de tecnicos actualizados.
+
+- POST /:id/cerrar-corte
+  - Roles: administrador, coordinador.
+  - Coordinador solo puede cerrar tecnicos bajo su coordinacion.
+  - Aplica estado_corte=corte_aplicado al tecnico indicado.
 
 - POST /:id/codigo
   - Solo administrador.
@@ -267,7 +336,7 @@ Requiere autenticacion.
 
 - PATCH /:id
   - Solo administrador.
-  - Body parcial: nombre, descripcion, created_by?.
+  - Body parcial: nombre, descripcion.
 
 - DELETE /:id
   - Solo administrador.
@@ -288,6 +357,7 @@ Requiere autenticacion.
     - nombre
     - municipio
     - localidad?
+    - localidad_id? (uuid FK a tabla localidades)
     - direccion?
     - cp?
     - telefono_principal?
@@ -299,7 +369,7 @@ Requiere autenticacion.
 
 - PATCH /:id
   - Roles: administrador, coordinador.
-  - Body parcial de los mismos campos.
+  - Body parcial de los mismos campos incluyendo localidad_id.
   - Si se envía tecnico_id, valida que el técnico exista y esté activo.
   - Coordinador solo puede asignar técnicos bajo su coordinación.
 
@@ -381,7 +451,8 @@ Requiere roles administrador o coordinador.
 
 ### Notificaciones (/notificaciones)
 
-Requiere roles administrador o coordinador.
+Requiere autenticacion (todos los roles incluido tecnico).
+Cada ruta filtra por destino_id del usuario autenticado.
 
 - GET /
   - Lista no leidas del usuario autenticado.
@@ -391,6 +462,81 @@ Requiere roles administrador o coordinador.
 
 - PATCH /leer-todas
   - Marca todas como leidas para el usuario.
+
+### Localidades (/localidades)
+
+Catalogo manual de localidades por municipio.
+
+- GET /
+  - Roles: administrador, coordinador.
+  - Devuelve localidades activas ordenadas por municipio, nombre.
+
+- POST /
+  - Solo administrador.
+  - Body: municipio, nombre, cp? (exactamente 5 digitos).
+
+- PATCH /:id
+  - Solo administrador.
+  - Body parcial: municipio, nombre, cp.
+  - Solo actualiza localidades activas.
+
+- DELETE /:id
+  - Solo administrador.
+  - Soft delete: activo=false.
+
+### Configuraciones (/configuraciones)
+
+Almacen clave-valor JSONB de configuraciones globales.
+Claves predefinidas: fecha_corte_global, ciclo_nombre, pdf_encabezado.
+
+- GET /
+  - Solo administrador.
+  - Lista todas con clave, valor, descripcion, updated_at.
+
+- GET /:clave
+  - Roles: administrador, coordinador.
+  - Lee una configuracion especifica.
+
+- PUT /:clave
+  - Solo administrador.
+  - Body: { valor: object } — reemplaza el valor JSONB completo.
+  - Retorna 404 si la clave no existe.
+
+Ejemplo para pdf_encabezado:
+```json
+{
+  "valor": {
+    "institucion": "Secretaria de Desarrollo Agropecuario",
+    "dependencia": "Direccion de Fomento",
+    "logo_url": "https://...",
+    "pie_pagina": "Hidalgo, Mexico"
+  }
+}
+```
+
+### Documentos Plantilla (/documentos-plantilla)
+
+Catalogo global de documentos requeridos por beneficiario.
+
+- GET /activos
+  - Roles: administrador, coordinador.
+  - Devuelve documentos activos ordenados por orden, nombre.
+
+- GET /
+  - Solo administrador.
+  - Devuelve todos los documentos (activos e inactivos).
+
+- POST /
+  - Solo administrador.
+  - Body: nombre, descripcion?, obligatorio? (default true), orden? (default 0).
+
+- PATCH /:id
+  - Solo administrador.
+  - Body parcial: nombre, descripcion, obligatorio, orden, activo.
+
+- DELETE /:id
+  - Solo administrador.
+  - Soft delete: activo=false.
 
 ### Archive (/archive)
 
@@ -404,10 +550,12 @@ Requiere rol administrador.
 
 - POST /:periodo/confirmar
   - Body: { confirmar: true }
-  - Inserta evento de confirmacion en archive_logs (append-only).
+  - Actualiza el registro mas reciente del periodo a estado=confirmado.
+  - Retorna 404 si no existe archivado para ese periodo.
 
 - POST /:periodo/forzar
-  - Inserta evento de generacion en archive_logs (append-only).
+  - Inserta evento de generacion en archive_logs.
+  - Retorna 409 si ya existe un archivado en estado=generando para ese periodo.
 
 ## Codigos de error comunes
 

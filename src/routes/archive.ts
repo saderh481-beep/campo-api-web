@@ -54,10 +54,18 @@ app.post(
   async (c) => {
     const { periodo } = c.req.param();
     const user = c.get("user");
-    await sql`
-      INSERT INTO archive_logs (periodo, estado, confirmado_en, confirmado_por)
-      VALUES (${periodo}, 'confirmado', NOW(), ${user.sub})
+    const [log] = await sql`
+      UPDATE archive_logs
+      SET estado = 'confirmado', confirmado_en = NOW(), confirmado_por = ${user.sub}
+      WHERE id = (
+        SELECT id FROM archive_logs
+        WHERE periodo = ${periodo}
+        ORDER BY created_at DESC
+        LIMIT 1
+      )
+      RETURNING id
     `;
+    if (!log) return c.json({ error: "No se encontró archivado para ese periodo" }, 404);
     return c.json({ message: `Archivado ${periodo} confirmado` });
   }
 );
@@ -66,6 +74,10 @@ app.post(
   "/:periodo/forzar",
   async (c) => {
     const { periodo } = c.req.param();
+    const [existente] = await sql`
+      SELECT id FROM archive_logs WHERE periodo = ${periodo} AND estado = 'generando'
+    `;
+    if (existente) return c.json({ error: "Ya existe un archivado en progreso para ese periodo" }, 409);
     await sql`
       INSERT INTO archive_logs (periodo, estado)
       VALUES (${periodo}, 'generando')

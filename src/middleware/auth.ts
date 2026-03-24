@@ -8,6 +8,7 @@ type SessionPayload = {
   nombre: string;
   correo: string;
   created_at: string;
+  fecha_limite?: string; // presente solo para tecnicos
 };
 
 type Env = { Variables: { user: JwtPayload; sessionToken: string } };
@@ -27,6 +28,17 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     session = JSON.parse(rawSession) as SessionPayload;
   } catch {
     return c.json({ error: "Sesion invalida" }, 401);
+  }
+
+  // Bloqueo automático: técnicos con período vencido
+  if (session.rol === "tecnico" && session.fecha_limite) {
+    if (new Date(session.fecha_limite) < new Date()) {
+      await redis.del(`session:${token}`);
+      return c.json(
+        { error: "periodo_vencido", message: "Tu período de acceso ha concluido." },
+        401
+      );
+    }
   }
 
   c.set("sessionToken", token);
