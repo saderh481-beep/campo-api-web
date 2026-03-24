@@ -62,6 +62,45 @@ bun run schema
 bun run typecheck
 ```
 
+## Novedades recientes
+
+- Beneficiarios: se agrego soporte completo de `localidad_id` en `GET /beneficiarios`, `POST /beneficiarios` y `PATCH /beneficiarios/:id`.
+- Usuarios (PATCH): `hash_codigo_acceso` solo se recalcula cuando se envia `codigo_acceso` nuevo.
+- Archive: `POST /archive/:periodo/confirmar` ahora actualiza el registro mas reciente del periodo (no inserta un duplicado).
+- Archive: `POST /archive/:periodo/forzar` retorna `409` si ya existe un archivado en progreso para ese periodo.
+- Notificaciones: accesibles para cualquier usuario autenticado (incluye tecnico), siempre filtradas por `destino_id`.
+- Actividades (PATCH): `created_by` ya no es editable desde API.
+
+## Arranque rapido
+
+```bash
+# Instalar dependencias
+bun install
+
+# Levantar API en modo desarrollo (watch)
+bun run dev
+
+# Ejecutar una corrida normal
+bun run start
+```
+
+## Configuracion de entorno
+
+1. Crear archivo `.env` en la raiz del proyecto.
+2. Copiar variables desde `env.example` y ajustar valores reales por ambiente.
+3. Validar conectividad de PostgreSQL y Redis antes de iniciar.
+
+Variables clave:
+- `DATABASE_URL` / `DATABASE_DIRECT_URL`
+- `REDIS_URL`
+- `JWT_SECRET`
+- `CLOUDINARY_*`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `PORT`, `WEB_ORIGIN`, `NODE_ENV`
+
+Nota: `.env` ya esta ignorado por Git en `.gitignore`.
+
 ## Endpoints
 
 ## Tabla Rapida
@@ -252,6 +291,7 @@ Requiere rol administrador.
 - PATCH /:id
   - Body parcial: nombre, correo, rol, codigo_acceso, telefono, coordinador_id, fecha_limite.
   - Si se actualiza codigo_acceso, tambien se actualiza hash_codigo_acceso.
+  - Si no se envia codigo_acceso, se conserva el hash actual sin recalcular.
   - Valida correo unico entre usuarios activos.
   - Si rol final es tecnico y se envia coordinador_id, valida que el coordinador exista y este activo.
   - Si el usuario es tecnico, sincroniza datos en tabla tecnicos.
@@ -425,9 +465,11 @@ Requiere roles administrador o coordinador.
 
 - GET /:id/pdf
   - Render inline PDF.
+  - Usa configuracion dinamica desde `configuraciones.clave = 'pdf_encabezado'`.
 
 - GET /:id/pdf/descargar
   - Descarga PDF.
+  - Usa configuracion dinamica desde `configuraciones.clave = 'pdf_encabezado'`.
 
 - POST /:id/pdf/imprimir
   - Genera PDF, lo sube y registra version en pdf_versiones.
