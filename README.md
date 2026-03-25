@@ -74,6 +74,9 @@ bun run typecheck
 ## Novedades recientes
 
 - Beneficiarios: se agrego soporte completo de `localidad_id` en `GET /beneficiarios`, `POST /beneficiarios` y `PATCH /beneficiarios/:id`.
+- Beneficiarios: el alcance para coordinador en listado, detalle y documentos ahora se determina por `beneficiarios.tecnico_id` + `tecnico_detalles.coordinador_id`.
+- Beneficiarios: al crear o reasignar un beneficiario se sincroniza tambien `asignaciones_beneficiario` para mantener consistencia con modulos de tecnicos/asignaciones.
+- Beneficiarios: `telefono_principal` y `telefono_secundario` se almacenan como `TEXT` normalizado, no como binario.
 - Usuarios (PATCH): `hash_codigo_acceso` solo se recalcula cuando se envia `codigo_acceso` nuevo.
 - Archive: `POST /archive/:periodo/confirmar` ahora actualiza el registro mas reciente del periodo (no inserta un duplicado).
 - Archive: `POST /archive/:periodo/forzar` retorna `409` si ya existe un archivado en progreso para ese periodo.
@@ -528,11 +531,15 @@ Requiere autenticacion.
 
 - GET /
   - Roles: administrador, coordinador.
+  - Administrador ve todos los beneficiarios.
+  - Coordinador solo ve beneficiarios cuyo `tecnico_id` pertenece a un tecnico activo bajo su coordinacion.
   - Respuestas:
     - 200: Beneficiario[]
 
 - GET /:id
+  - Roles: administrador, coordinador.
   - Regresa beneficiario con cadenas activas y documentos.
+  - Coordinador solo puede consultar beneficiarios de sus tecnicos.
   - Respuestas:
     - 200: BeneficiarioDetalle
     - 404: { error: "Beneficiario no encontrado" }
@@ -550,8 +557,9 @@ Requiere autenticacion.
     - telefono_secundario?
     - coord_parcela? (formato x,y o (x,y))
     - tecnico_id
-  - telefonos se almacenan como bytea.
+  - telefonos se almacenan como texto normalizado (`TEXT`).
   - coord_parcela se almacena como point.
+  - Si la creacion es exitosa, tambien se crea la asignacion activa correspondiente en `asignaciones_beneficiario`.
   - Respuestas:
     - 201: Beneficiario
     - 400: { error }
@@ -560,8 +568,10 @@ Requiere autenticacion.
 - PATCH /:id
   - Roles: administrador, coordinador.
   - Body parcial de los mismos campos incluyendo localidad_id.
+  - Coordinador solo puede editar beneficiarios de sus tecnicos.
   - Si se envía tecnico_id, valida que el técnico exista y esté activo.
   - Coordinador solo puede asignar técnicos bajo su coordinación.
+  - Si cambia `tecnico_id`, se desactivan asignaciones activas previas del beneficiario y se crea la nueva asignacion en `asignaciones_beneficiario`.
   - Respuestas:
     - 200: Beneficiario
     - 400: { error }
@@ -578,15 +588,20 @@ Requiere autenticacion.
 - POST /:id/documentos
   - Roles: administrador, coordinador.
   - FormData: archivo, tipo.
+  - Coordinador solo puede subir documentos a beneficiarios de sus tecnicos.
   - Guarda metadata en documentos (r2_key, sha256, bytes, subido_por).
   - Respuestas:
     - 201: Documento
     - 400: { error }
+    - 404: { error: "Beneficiario no encontrado" }
 
 - GET /:id/documentos
+  - Roles: administrador, coordinador.
   - Lista documentos del beneficiario.
+  - Coordinador solo puede listar documentos de beneficiarios de sus tecnicos.
   - Respuestas:
     - 200: Documento[]
+    - 404: { error: "Beneficiario no encontrado" }
 
 ### Asignaciones (/asignaciones)
 
