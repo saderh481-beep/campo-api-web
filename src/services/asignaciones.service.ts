@@ -28,6 +28,12 @@ export async function removerAsignacionCoordinadorTecnico(tecnicoId: string) {
 }
 
 export async function asignarBeneficiario(tecnicoId: string, beneficiarioId: string, actorId: string) {
+  const tecnico = await findTecnicoActivo(tecnicoId);
+  if (!tecnico) return { status: 400 as const, body: { error: "Técnico inválido o inactivo" } };
+
+  const [beneficiario] = await sql`SELECT id FROM beneficiarios WHERE id = ${beneficiarioId} AND activo = true`;
+  if (!beneficiario) return { status: 404 as const, body: { error: "Beneficiario no encontrado" } };
+
   const [existente] = await sql`
     SELECT id FROM asignaciones_beneficiario
     WHERE tecnico_id = ${tecnicoId} AND beneficiario_id = ${beneficiarioId}
@@ -48,7 +54,7 @@ export async function asignarBeneficiario(tecnicoId: string, beneficiarioId: str
         RETURNING id, tecnico_id, beneficiario_id, activo, asignado_por, asignado_en, removido_en
       `;
 
-  return row;
+  return { status: 201 as const, body: row };
 }
 
 export async function removerAsignacionBeneficiario(id: string) {
@@ -62,6 +68,12 @@ export async function removerAsignacionBeneficiario(id: string) {
 }
 
 export async function asignarActividad(tecnicoId: string, actividadId: string, actorId: string) {
+  const tecnico = await findTecnicoActivo(tecnicoId);
+  if (!tecnico) return { status: 400 as const, body: { error: "Técnico inválido o inactivo" } };
+
+  const [actividad] = await sql`SELECT id FROM actividades WHERE id = ${actividadId} AND activo = true`;
+  if (!actividad) return { status: 404 as const, body: { error: "Actividad no encontrada" } };
+
   const [existente] = await sql`
     SELECT id FROM asignaciones_actividad
     WHERE tecnico_id = ${tecnicoId} AND actividad_id = ${actividadId}
@@ -82,7 +94,7 @@ export async function asignarActividad(tecnicoId: string, actividadId: string, a
         RETURNING id, tecnico_id, actividad_id, activo, asignado_por, asignado_en, removido_en
       `;
 
-  return row;
+  return { status: 201 as const, body: row };
 }
 
 export async function removerAsignacionActividad(id: string) {

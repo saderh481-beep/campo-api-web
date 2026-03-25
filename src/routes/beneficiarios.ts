@@ -115,21 +115,32 @@ app.post(
       return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
     }
 
-    const [nuevo] = await sql`
-      INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
-                                telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-      VALUES (${body.nombre}, ${body.municipio}, ${body.localidad ?? null},
-              ${body.localidad_id ?? null}, ${body.direccion ?? null}, ${body.cp ?? null},
-              ${encodePhone(body.telefono_principal)},
-              ${encodePhone(body.telefono_secundario)}, ${coordParcela}::point, ${body.tecnico_id})
-      RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
-                telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
-    `;
-
-    await sql`
-      INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-      VALUES (${body.tecnico_id}, ${nuevo.id}, ${user.sub})
-    `;
+    const reserved = await sql.reserve();
+    let nuevo: Record<string, unknown>;
+    try {
+      await reserved`BEGIN`;
+      const [row] = await reserved`
+        INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
+                                  telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
+        VALUES (${body.nombre}, ${body.municipio}, ${body.localidad ?? null},
+                ${body.localidad_id ?? null}, ${body.direccion ?? null}, ${body.cp ?? null},
+                ${encodePhone(body.telefono_principal)},
+                ${encodePhone(body.telefono_secundario)}, ${coordParcela}::point, ${body.tecnico_id})
+        RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
+                  telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
+      `;
+      await reserved`
+        INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
+        VALUES (${body.tecnico_id}, ${row.id}, ${user.sub})
+      `;
+      await reserved`COMMIT`;
+      nuevo = row;
+    } catch (err) {
+      await reserved`ROLLBACK`;
+      throw err;
+    } finally {
+      reserved.release();
+    }
 
     return c.json(nuevo, 201);
   }
@@ -186,35 +197,46 @@ app.patch(
       }
     }
 
-    const [actualizado] = await sql`
-      UPDATE beneficiarios SET
-        nombre      = COALESCE(${body.nombre ?? null}, nombre),
-        municipio   = COALESCE(${body.municipio ?? null}, municipio),
-        localidad   = COALESCE(${body.localidad ?? null}, localidad),
-        localidad_id = COALESCE(${body.localidad_id ?? null}, localidad_id),
-        direccion   = COALESCE(${body.direccion ?? null}, direccion),
-        cp          = COALESCE(${body.cp ?? null}, cp),
-        telefono_principal  = COALESCE(${encodePhone(body.telefono_principal)}, telefono_principal),
-        telefono_secundario = COALESCE(${encodePhone(body.telefono_secundario)}, telefono_secundario),
-        coord_parcela = COALESCE(${coordParcela}::point, coord_parcela),
-        tecnico_id  = COALESCE(${body.tecnico_id ?? null}, tecnico_id),
-        updated_at  = NOW()
-      WHERE id = ${id}
-      RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
-                telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
-    `;
-
-    if (body.tecnico_id && body.tecnico_id !== beneficiarioActual.tecnico_id) {
-      await sql`
-        UPDATE asignaciones_beneficiario
-        SET activo = false, removido_en = NOW()
-        WHERE beneficiario_id = ${id} AND activo = true
+    const nuevoTecnicoId = body.tecnico_id;
+    const reserved = await sql.reserve();
+    let actualizado: Record<string, unknown>;
+    try {
+      await reserved`BEGIN`;
+      const [row] = await reserved`
+        UPDATE beneficiarios SET
+          nombre      = COALESCE(${body.nombre ?? null}, nombre),
+          municipio   = COALESCE(${body.municipio ?? null}, municipio),
+          localidad   = COALESCE(${body.localidad ?? null}, localidad),
+          localidad_id = COALESCE(${body.localidad_id ?? null}, localidad_id),
+          direccion   = COALESCE(${body.direccion ?? null}, direccion),
+          cp          = COALESCE(${body.cp ?? null}, cp),
+          telefono_principal  = COALESCE(${encodePhone(body.telefono_principal)}, telefono_principal),
+          telefono_secundario = COALESCE(${encodePhone(body.telefono_secundario)}, telefono_secundario),
+          coord_parcela = COALESCE(${coordParcela}::point, coord_parcela),
+          tecnico_id  = COALESCE(${nuevoTecnicoId ?? null}, tecnico_id),
+          updated_at  = NOW()
+        WHERE id = ${id}
+        RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
+                  telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
       `;
-
-      await sql`
-        INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-        VALUES (${body.tecnico_id}, ${id}, ${user.sub})
-      `;
+      if (nuevoTecnicoId && nuevoTecnicoId !== beneficiarioActual.tecnico_id) {
+        await reserved`
+          UPDATE asignaciones_beneficiario
+          SET activo = false, removido_en = NOW()
+          WHERE beneficiario_id = ${id} AND activo = true
+        `;
+        await reserved`
+          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
+          VALUES (${nuevoTecnicoId}, ${id}, ${user.sub})
+        `;
+      }
+      await reserved`COMMIT`;
+      actualizado = row;
+    } catch (err) {
+      await reserved`ROLLBACK`;
+      throw err;
+    } finally {
+      reserved.release();
     }
 
     return c.json(actualizado);

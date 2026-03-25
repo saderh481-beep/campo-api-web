@@ -62,10 +62,14 @@ export async function editarUsuario(id: string, input: UsuarioUpdateInput) {
   }
 
   const row = await updateUsuario(id, { ...input, hash_codigo_acceso: hashCodigoAcceso });
+
   const rolFinal = input.rol ?? usuario.rol;
-  if (usuario.rol === "tecnico" && rolFinal !== "tecnico") {
+  const roleChangingFromTecnico = usuario.rol === "tecnico" && rolFinal !== "tecnico";
+  const beingDeactivated = input.activo === false && usuario.activo === true;
+  if ((roleChangingFromTecnico || beingDeactivated) && usuario.rol === "tecnico") {
     await updateTecnicoDetalle(id, { activo: false, estado_corte: "baja" });
   }
+
   return { status: 200 as const, body: row };
 }
 
@@ -73,11 +77,12 @@ export async function eliminarUsuario(id: string, actorId: string) {
   if (id === actorId) return { status: 400 as const, body: { error: "No puedes desactivar tu propia cuenta" } };
 
   const usuario = await findUsuarioById(id);
-  if (usuario?.rol === "tecnico") {
+  if (!usuario) return { status: 404 as const, body: { error: "Usuario no encontrado" } };
+
+  if (usuario.rol === "tecnico") {
     await updateTecnicoDetalle(id, { activo: false, estado_corte: "baja" });
   }
 
-  const row = await deactivateUsuario(id);
-  if (!row) return { status: 404 as const, body: { error: "Usuario no encontrado" } };
+  await deactivateUsuario(id);
   return { status: 200 as const, body: { message: "Usuario desactivado" } };
 }

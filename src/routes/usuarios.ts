@@ -36,6 +36,7 @@ app.patch(
       rol: z.enum(["tecnico", "coordinador", "administrador"]).optional(),
       codigo_acceso: z.string().regex(/^\d{5,6}$/).optional(),
       telefono: z.string().optional(),
+      activo: z.boolean().optional(),
     })
   ),
   (c) => patchUsuario(c, c.req.valid("json"))

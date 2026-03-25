@@ -32,8 +32,8 @@ export async function deleteAsignacionCoordinadorTecnico(c: Context<AppEnv>) {
 
 export async function postAsignacionBeneficiario(c: Context<AppEnv>, body: { tecnico_id: string; beneficiario_id: string }) {
   const user = c.get("user");
-  const row = await asignarBeneficiario(body.tecnico_id, body.beneficiario_id, user.sub);
-  return c.json(row, 201);
+  const result = await asignarBeneficiario(body.tecnico_id, body.beneficiario_id, user.sub);
+  return c.json(result.body, result.status);
 }
 
 export async function deleteAsignacionBeneficiario(c: Context<AppEnv>) {
@@ -45,8 +45,8 @@ export async function deleteAsignacionBeneficiario(c: Context<AppEnv>) {
 
 export async function postAsignacionActividad(c: Context<AppEnv>, body: { tecnico_id: string; actividad_id: string }) {
   const user = c.get("user");
-  const row = await asignarActividad(body.tecnico_id, body.actividad_id, user.sub);
-  return c.json(row, 201);
+  const result = await asignarActividad(body.tecnico_id, body.actividad_id, user.sub);
+  return c.json(result.body, result.status);
 }
 
 export async function deleteAsignacionActividad(c: Context<AppEnv>) {

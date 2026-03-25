@@ -13,6 +13,7 @@ export type UsuarioUpdateInput = {
   rol?: "tecnico" | "coordinador" | "administrador";
   telefono?: string;
   codigo_acceso?: string;
+  activo?: boolean;
 };
 
 export async function listUsuarios() {
@@ -34,8 +35,8 @@ export async function findUsuarioById(id: string) {
 
 export async function existsUsuarioByCorreo(correo: string, exceptId?: string) {
   const [row] = exceptId
-    ? await sql`SELECT id FROM usuarios WHERE correo = ${correo} AND id <> ${exceptId}`
-    : await sql`SELECT id FROM usuarios WHERE correo = ${correo}`;
+    ? await sql`SELECT id FROM usuarios WHERE correo = ${correo} AND id <> ${exceptId} AND activo = true`
+    : await sql`SELECT id FROM usuarios WHERE correo = ${correo} AND activo = true`;
   return Boolean(row);
 }
 
@@ -62,6 +63,7 @@ export async function updateUsuario(id: string, input: UsuarioUpdateInput & { ha
       telefono = COALESCE(${input.telefono ?? null}, telefono),
       codigo_acceso = COALESCE(${input.codigo_acceso ?? null}, codigo_acceso),
       hash_codigo_acceso = COALESCE(${input.hash_codigo_acceso ?? null}, hash_codigo_acceso),
+      activo = COALESCE(${input.activo ?? null}, activo),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING id, nombre, correo, rol, codigo_acceso, telefono, activo, created_at, updated_at

@@ -82,6 +82,10 @@ bun run typecheck
 - Archive: `POST /archive/:periodo/forzar` retorna `409` si ya existe un archivado en progreso para ese periodo.
 - Notificaciones: accesibles para administrador y tecnico autenticados, siempre filtradas por `destino_id`.
 - Actividades (PATCH): `created_by` ya no es editable desde API.
+- Usuarios (PATCH): se agrego campo `activo` (boolean) — permite reactivar o desactivar un usuario desde el mismo endpoint PATCH. Desactivar un tecnico tambien marca su `tecnico_detalles` como inactivo con `estado_corte=baja`.
+- Usuarios (POST): la validacion de correo duplicado ahora solo bloquea si existe otro usuario **activo** con ese correo (permite reutilizar correos de usuarios eliminados).
+- Asignaciones (POST /beneficiario y POST /actividad): ahora validan que el tecnico y la entidad destino existan y esten activos antes de insertar. Errores: `400 tecnico invalido`, `404 beneficiario/actividad no encontrado`.
+- Beneficiarios (POST y PATCH): la creacion y reasignacion de tecnico ahora ocurre en una transaccion atomica junto con `asignaciones_beneficiario`, eliminando posibles registros huerfanos.
 
 ## Arranque rapido
 
@@ -166,7 +170,7 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 |---|---|---|---|
 | GET | /usuarios | administrador | - |
 | POST | /usuarios | administrador | { correo, nombre, rol, telefono? } |
-| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol?, codigo_acceso?, telefono? } |
+| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol?, codigo_acceso?, telefono?, activo? } |
 | DELETE | /usuarios/:id | administrador | - |
 
 ### Tecnicos

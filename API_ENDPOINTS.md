@@ -60,49 +60,101 @@ Errors:
 ## Usuarios
 Role required: administrador
 
+Shape `Usuario`:
+```json
+{
+  "id": "uuid",
+  "nombre": "string",
+  "correo": "string",
+  "rol": "administrador|coordinador|tecnico",
+  "codigo_acceso": "string",
+  "telefono": "string|null",
+  "activo": true,
+  "created_at": "ISO datetime",
+  "updated_at": "ISO datetime"
+}
+```
+
 ### GET /usuarios
+Devuelve todos los usuarios (activos e inactivos).
+
 Success:
-- 200: Usuario[]
+- 200: `Usuario[]`
 
 ### POST /usuarios
+Crea un nuevo usuario. El `codigo_acceso` se genera automáticamente:
+- `tecnico` → 5 dígitos
+- `coordinador` / `administrador` → 6 dígitos
+
+La validación de correo solo bloquea si existe otro usuario **activo** con ese correo.
+
 Request body:
 ```json
 {
-  "correo": "string",
-  "nombre": "string",
+  "correo": "user@example.com",
+  "nombre": "Nombre Apellido",
   "rol": "tecnico|coordinador|administrador",
-  "telefono": "string?"
+  "telefono": "string (opcional)"
 }
 ```
 Success:
-- 201: Usuario (includes generated codigo_acceso)
-Errors:
-- 409: { "error": "El correo ya está registrado" }
-
-### PATCH /usuarios/:id
-Request body (partial):
 ```json
 {
-  "nombre": "string?",
-  "correo": "string?",
-  "rol": "tecnico|coordinador|administrador?",
-  "codigo_acceso": "string?",
-  "telefono": "string?"
+  "id": "uuid",
+  "nombre": "string",
+  "correo": "string",
+  "rol": "string",
+  "codigo_acceso": "12345",
+  "telefono": null,
+  "activo": true,
+  "created_at": "ISO datetime",
+  "updated_at": "ISO datetime"
+}
+```
+Status: 201
+
+Errors:
+- 409: `{ "error": "El correo ya está registrado" }`
+- 422: error de validación (campo faltante o inválido)
+
+### PATCH /usuarios/:id
+Edita un usuario. Todos los campos son opcionales.
+
+Nota `activo`: usar `true` para reactivar, `false` para desactivar (equivalente a DELETE pero con respuesta completa del usuario actualizado). Si se desactiva un usuario con `rol=tecnico`, también se marca su `tecnico_detalles` como inactivo con `estado_corte=baja`.
+
+Nota `codigo_acceso`: si se envía, también se recalcula `hash_codigo_acceso`. La longitud debe coincidir con el rol final (5 para tecnico, 6 para otros).
+
+Request body (todos opcionales):
+```json
+{
+  "nombre": "string",
+  "correo": "email",
+  "rol": "tecnico|coordinador|administrador",
+  "codigo_acceso": "12345 o 123456",
+  "telefono": "string",
+  "activo": true
 }
 ```
 Success:
-- 200: Usuario
+- 200: `Usuario` (mismo shape que POST)
+
 Errors:
-- 400: { "error": string }
-- 404: { "error": "Usuario no encontrado" }
-- 409: { "error": "El correo ya está registrado" }
+- 400: `{ "error": "El codigo_acceso para rol tecnico debe tener 5 dígitos" }`
+- 404: `{ "error": "Usuario no encontrado" }`
+- 409: `{ "error": "El correo ya está registrado" }`
+- 422: error de validación de campo
 
 ### DELETE /usuarios/:id
+Soft-delete: marca `activo=false`. Si el usuario tiene `rol=tecnico`, también desactiva su `tecnico_detalles`.
+
+Nota: no se puede eliminar la propia cuenta del usuario autenticado.
+
 Success:
-- 200: { "message": "Usuario desactivado" }
+- 200: `{ "message": "Usuario desactivado" }`
+
 Errors:
-- 400: { "error": "No puedes desactivar tu propia cuenta" }
-- 404: { "error": "Usuario no encontrado" }
+- 400: `{ "error": "No puedes desactivar tu propia cuenta" }`
+- 404: `{ "error": "Usuario no encontrado" }`
 
 ## Tecnicos
 
@@ -174,119 +226,312 @@ Errors:
 ## Asignaciones
 Role required: administrador
 
-### GET /asignaciones/coordinador-tecnico?tecnico_id=<uuid>
+Shape `TecnicoDetalle`:
+```json
+{
+  "id": "uuid",
+  "tecnico_id": "uuid",
+  "coordinador_id": "uuid",
+  "coordinador_nombre": "string",
+  "fecha_limite": "ISO datetime",
+  "estado_corte": "en_servicio|corte_aplicado|baja",
+  "activo": true,
+  "created_at": "ISO datetime",
+  "updated_at": "ISO datetime"
+}
+```
+
+Shape `AsignacionBeneficiario`:
+```json
+{
+  "id": "uuid",
+  "tecnico_id": "uuid",
+  "beneficiario_id": "uuid",
+  "activo": true,
+  "asignado_por": "uuid",
+  "asignado_en": "ISO datetime",
+  "removido_en": "ISO datetime|null"
+}
+```
+
+Shape `AsignacionActividad`:
+```json
+{
+  "id": "uuid",
+  "tecnico_id": "uuid",
+  "actividad_id": "uuid",
+  "activo": true,
+  "asignado_por": "uuid",
+  "asignado_en": "ISO datetime",
+  "removido_en": "ISO datetime|null"
+}
+```
+
+### GET /asignaciones/coordinador-tecnico?tecnico_id=\<uuid\>
+Query param requerido: `tecnico_id` (uuid).
+
 Success:
-- 200: TecnicoDetalle
+- 200: `TecnicoDetalle`
+
 Errors:
-- 400: { "error": "tecnico_id es requerido" }
-- 404: { "error": "Asignación no encontrada" }
+- 400: `{ "error": "tecnico_id es requerido" }`
+- 404: `{ "error": "Asignación no encontrada" }`
 
 ### POST /asignaciones/coordinador-tecnico
+Asigna o reasigna coordinador a un técnico. Valida que coordinador y técnico existan y estén activos.
+
 Request body:
 ```json
-{ "tecnico_id": "uuid", "coordinador_id": "uuid", "fecha_limite": "ISO datetime" }
+{
+  "tecnico_id": "uuid",
+  "coordinador_id": "uuid",
+  "fecha_limite": "ISO datetime"
+}
 ```
 Success:
-- 201: TecnicoDetalle
+- 201: `TecnicoDetalle`
+
 Errors:
-- 400: { "error": "Coordinador inválido o inactivo" }
-- 400: { "error": "Técnico inválido o inactivo" }
+- 400: `{ "error": "Coordinador inválido o inactivo" }`
+- 400: `{ "error": "Técnico inválido o inactivo" }`
 
 ### DELETE /asignaciones/coordinador-tecnico/:tecnico_id
+Marca `activo=false` y `estado_corte=baja` en `tecnico_detalles`.
+
 Success:
-- 200: { "message": "Asignación removida" }
+- 200: `{ "message": "Asignación removida" }`
+
 Errors:
-- 404: { "error": "Asignación no encontrada" }
+- 404: `{ "error": "Asignación no encontrada" }`
 
 ### POST /asignaciones/beneficiario
+Asigna o reactiva una asignación de beneficiario a técnico. Si ya existía una asignación previa para esa pareja, la reactiva en lugar de insertar un duplicado. Valida que el técnico y el beneficiario existan y estén activos.
+
 Request body:
 ```json
-{ "tecnico_id": "uuid", "beneficiario_id": "uuid" }
+{
+  "tecnico_id": "uuid",
+  "beneficiario_id": "uuid"
+}
 ```
 Success:
-- 201: AsignacionBeneficiario
+- 201: `AsignacionBeneficiario`
+
+Errors:
+- 400: `{ "error": "Técnico inválido o inactivo" }`
+- 404: `{ "error": "Beneficiario no encontrado" }`
 
 ### DELETE /asignaciones/beneficiario/:id
+Soft-remove: marca `activo=false` y `removido_en=NOW()` por id de asignación.
+
 Success:
-- 200: { "message": "Asignación removida" }
+- 200: `{ "message": "Asignación removida" }`
+
 Errors:
-- 404: { "error": "Asignación no encontrada" }
+- 404: `{ "error": "Asignación no encontrada" }`
 
 ### POST /asignaciones/actividad
+Asigna o reactiva una actividad a un técnico. Valida que tanto el técnico como la actividad existan y estén activos.
+
 Request body:
 ```json
-{ "tecnico_id": "uuid", "actividad_id": "uuid" }
+{
+  "tecnico_id": "uuid",
+  "actividad_id": "uuid"
+}
 ```
 Success:
-- 201: AsignacionActividad
+- 201: `AsignacionActividad`
+
+Errors:
+- 400: `{ "error": "Técnico inválido o inactivo" }`
+- 404: `{ "error": "Actividad no encontrada" }`
 
 ### DELETE /asignaciones/actividad/:id
+Soft-remove: marca `activo=false` y `removido_en=NOW()` por id de asignación.
+
 Success:
-- 200: { "message": "Asignación de actividad removida" }
+- 200: `{ "message": "Asignación de actividad removida" }`
+
 Errors:
-- 404: { "error": "Asignación de actividad no encontrada" }
+- 404: `{ "error": "Asignación de actividad no encontrada" }`
 
 ## Beneficiarios
 Roles: administrador, coordinador
 
+Shape `Beneficiario`:
+```json
+{
+  "id": "uuid",
+  "tecnico_id": "uuid",
+  "nombre": "string",
+  "municipio": "string",
+  "localidad": "string|null",
+  "localidad_id": "uuid|null",
+  "direccion": "string|null",
+  "cp": "string|null",
+  "telefono_principal": "string|null",
+  "telefono_secundario": "string|null",
+  "coord_parcela": "(x,y)|null",
+  "activo": true,
+  "created_at": "ISO datetime",
+  "updated_at": "ISO datetime"
+}
+```
+
+Shape `BeneficiarioDetalle` (incluye relaciones):
+```json
+{
+  "id": "uuid",
+  "...campos de Beneficiario...",
+  "cadenas": [
+    { "id": "uuid", "nombre": "string" }
+  ],
+  "documentos": [
+    {
+      "id": "uuid",
+      "tipo": "string",
+      "nombre_original": "string",
+      "r2_key": "string (URL)",
+      "sha256": "string (64 hex)",
+      "bytes": 12345,
+      "subido_por": "uuid",
+      "created_at": "ISO datetime"
+    }
+  ]
+}
+```
+
 ### GET /beneficiarios
+Devuelve lista de beneficiarios.
+- Administrador: todos los beneficiarios.
+- Coordinador: solo los beneficiarios cuyo `tecnico_id` pertenece a un técnico activo bajo su coordinación.
+
+Ordenados por `nombre`.
+
 Success:
-- 200: Beneficiario[]
+- 200: `Beneficiario[]`
 
 ### GET /beneficiarios/:id
+Devuelve datos del beneficiario junto con cadenas productivas activas y documentos.
+- Coordinador: solo puede consultar beneficiarios de sus técnicos (devuelve 404 si no pertenece).
+
 Success:
-- 200: BeneficiarioDetalle (includes cadenas and documentos)
+- 200: `BeneficiarioDetalle`
+
 Errors:
-- 404: { "error": "Beneficiario no encontrado" }
+- 404: `{ "error": "Beneficiario no encontrado" }`
 
 ### POST /beneficiarios
+Crea un beneficiario y automáticamente crea la asignación activa en `asignaciones_beneficiario` dentro de la misma transacción.
+- Coordinador: solo puede asignar técnicos que estén bajo su coordinación.
+
 Request body:
+```json
+{
+  "nombre": "string (mín. 2 caracteres)",
+  "municipio": "string",
+  "localidad": "string (opcional)",
+  "localidad_id": "uuid (opcional, FK a localidades)",
+  "direccion": "string (opcional)",
+  "cp": "string (opcional)",
+  "telefono_principal": "string (opcional)",
+  "telefono_secundario": "string (opcional)",
+  "coord_parcela": "x,y o (x,y) (opcional)",
+  "tecnico_id": "uuid (requerido)"
+}
+```
+Success:
+- 201: `Beneficiario`
+
+Errors:
+- 400: `{ "error": "coord_parcela debe tener formato 'x,y'" }`
+- 400: `{ "error": "Técnico no encontrado o inactivo" }`
+- 403: `{ "error": "Sin permisos para asignar este técnico" }`
+- 422: error de validación (campo requerido faltante)
+
+### PATCH /beneficiarios/:id
+Edita campos del beneficiario. Si cambia `tecnico_id`, actualiza también `asignaciones_beneficiario` en la misma transacción (desactiva la asignación previa e inserta la nueva).
+- Coordinador: solo puede editar beneficiarios de sus técnicos y solo puede asignar técnicos bajo su coordinación.
+
+Request body (todos opcionales):
 ```json
 {
   "nombre": "string",
   "municipio": "string",
-  "localidad": "string?",
-  "localidad_id": "uuid?",
-  "direccion": "string?",
-  "cp": "string?",
-  "telefono_principal": "string?",
-  "telefono_secundario": "string?",
-  "coord_parcela": "x,y?",
+  "localidad": "string",
+  "localidad_id": "uuid",
+  "direccion": "string",
+  "cp": "string",
+  "telefono_principal": "string",
+  "telefono_secundario": "string",
+  "coord_parcela": "x,y o (x,y)",
   "tecnico_id": "uuid"
 }
 ```
 Success:
-- 201: Beneficiario
-Errors:
-- 400: { "error": string }
-- 403: { "error": "Sin permisos para asignar este técnico" }
+- 200: `Beneficiario`
 
-### PATCH /beneficiarios/:id
-Same fields as POST, all optional.
-Success:
-- 200: Beneficiario
 Errors:
-- 400, 403, 404
+- 400: `{ "error": "coord_parcela debe tener formato 'x,y'" }`
+- 400: `{ "error": "Técnico no encontrado o inactivo" }`
+- 403: `{ "error": "Sin permisos para asignar este técnico" }`
+- 404: `{ "error": "Beneficiario no encontrado" }`
 
 ### POST /beneficiarios/:id/cadenas
 Role: administrador
+
+Reemplaza las cadenas productivas del beneficiario. Usa `activo=false` para los registros previos y `activo=true` para los nuevos (sin borrado físico). Si `cadena_ids` está vacío, desactiva todas.
+
 Request body:
 ```json
-{ "cadena_ids": ["uuid"] }
+{
+  "cadena_ids": ["uuid", "uuid"]
+}
 ```
 Success:
-- 200: { "message": "Cadenas actualizadas" }
+- 200: `{ "message": "Cadenas actualizadas" }`
+
+Errors:
+- 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación
 
 ### POST /beneficiarios/:id/documentos
-FormData fields: archivo, tipo
+Sube un documento al beneficiario. Lo almacena en Cloudinary y guarda la metadata en la tabla `documentos`.
+- Coordinador: solo puede subir documentos a beneficiarios de sus técnicos.
+
+Request: `multipart/form-data`
+- `archivo` (File, requerido): archivo a subir.
+- `tipo` (string, requerido): categoría o tipo del documento (ej. `"ine"`, `"curp"`).
+
 Success:
-- 201: Documento
+```json
+{
+  "id": "uuid",
+  "tipo": "string",
+  "nombre_original": "string",
+  "r2_key": "string (URL de Cloudinary)",
+  "sha256": "string (64 hex)",
+  "bytes": 12345,
+  "subido_por": "uuid",
+  "created_at": "ISO datetime"
+}
+```
+Status: 201
+
 Errors:
-- 400: { "error": "Archivo y tipo son requeridos" }
+- 400: `{ "error": "Archivo y tipo son requeridos" }`
+- 404: `{ "error": "Beneficiario no encontrado" }`
 
 ### GET /beneficiarios/:id/documentos
+Lista documentos del beneficiario.
+- Coordinador: solo puede listar documentos de beneficiarios de sus técnicos.
+
 Success:
-- 200: Documento[]
+- 200: Documento[] (mismo shape que el body de POST /documentos)
+
+Errors:
+- 404: `{ "error": "Beneficiario no encontrado" }`
 
 ## Bitacoras
 Roles: administrador, coordinador
