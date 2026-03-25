@@ -49,8 +49,7 @@ export async function actualizarTecnico(id: string, body: TecnicoUpdateInput) {
     }
   }
 
-  const resetEstado = body.fecha_limite != null && new Date(body.fecha_limite) > new Date();
-  const actualizado = await updateTecnico(id, body, resetEstado);
+  const actualizado = await updateTecnico(id, body);
   return { status: 200 as const, body: actualizado };
 }
 

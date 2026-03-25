@@ -22,7 +22,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     return c.json({ error: "Sesion invalida" }, 401);
   }
 
-  // Bloqueo automático: técnicos con período vencido
+  // Bloqueo automático: técnicos con fecha de corte global vencida
   if (session.rol === "tecnico" && session.fecha_limite) {
     if (new Date(session.fecha_limite) < new Date()) {
       await redis.del(`session:${token}`);

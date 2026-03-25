@@ -70,31 +70,7 @@ async function main() {
       console.log(`OK ${row.rol}: ${row.correo}`);
     }
 
-    const [tableCheck] = await sql`
-      SELECT to_regclass('public.tecnico_detalles') AS tecnico_detalles_table
-    `;
-
-    if (tableCheck?.tecnico_detalles_table) {
-      const coordinador = upserted.find((u) => u.rol === "coordinador");
-      if (!coordinador) throw new Error("No se pudo resolver el coordinador base");
-
-      const tecnicos = upserted.filter((u) => u.rol === "tecnico");
-      for (const tecnico of tecnicos) {
-        await sql`
-          INSERT INTO tecnico_detalles (tecnico_id, coordinador_id, fecha_limite, estado_corte, activo)
-          VALUES (${tecnico.id}, ${coordinador.id}, NOW() + INTERVAL '120 days', 'en_servicio', true)
-          ON CONFLICT (tecnico_id)
-          DO UPDATE SET
-            coordinador_id = EXCLUDED.coordinador_id,
-            fecha_limite = EXCLUDED.fecha_limite,
-            estado_corte = 'en_servicio',
-            activo = true,
-            updated_at = NOW()
-        `;
-      }
-    } else {
-      console.log("Aviso: tecnico_detalles no existe aun; solo se sembraron usuarios.");
-    }
+    console.log("Nota: este script solo crea usuarios base. La asignacion coordinador-tecnico y fecha limite se gestionan en el flujo de asignaciones.");
 
     console.log("\nUsuarios base listos:");
     for (const row of upserted) {

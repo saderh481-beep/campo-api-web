@@ -79,7 +79,7 @@ export async function isCoordinadorActivo(id: string) {
   return Boolean(coordinador);
 }
 
-export async function updateTecnico(id: string, body: TecnicoUpdateInput, resetEstado: boolean) {
+export async function updateTecnico(id: string, body: TecnicoUpdateInput) {
   const [actualizado] = await sql`
     UPDATE usuarios SET
       nombre         = COALESCE(${body.nombre ?? null}, nombre),
@@ -90,11 +90,10 @@ export async function updateTecnico(id: string, body: TecnicoUpdateInput, resetE
     RETURNING id, nombre, correo, telefono, activo, created_at, updated_at
   `;
 
-  if (body.coordinador_id || body.fecha_limite || resetEstado) {
+  if (body.coordinador_id || body.fecha_limite) {
     await updateTecnicoDetalle(id, {
       coordinador_id: body.coordinador_id,
       fecha_limite: body.fecha_limite,
-      estado_corte: resetEstado ? "en_servicio" : undefined,
     });
   }
 
@@ -110,6 +109,19 @@ export async function updateTecnicoCodigo(id: string, codigo: string, hashCodigo
 }
 
 export async function applyCortesVencidos() {
+  const [config] = await sql`
+    SELECT valor
+    FROM configuraciones
+    WHERE clave = 'fecha_corte_global'
+  `;
+
+  const fechaRaw = (config?.valor as { fecha?: unknown } | null)?.fecha;
+  const fechaCorte = typeof fechaRaw === "string" && fechaRaw.trim().length > 0
+    ? fechaRaw
+    : null;
+
+  if (!fechaCorte) return [];
+
   return sql`
     UPDATE tecnico_detalles td
     SET estado_corte = 'corte_aplicado',
@@ -117,12 +129,11 @@ export async function applyCortesVencidos() {
     FROM usuarios t
     WHERE td.tecnico_id = t.id
       AND t.rol = 'tecnico'
-      AND td.fecha_limite IS NOT NULL
-      AND td.fecha_limite < NOW()
+      AND ${fechaCorte}::timestamptz < NOW()
       AND td.estado_corte = 'en_servicio'
       AND td.activo = true
       AND t.activo = true
-    RETURNING t.id, t.nombre, t.correo, td.fecha_limite
+    RETURNING t.id, t.nombre, t.correo, ${fechaCorte}::timestamptz AS fecha_corte
   `;
 }
 

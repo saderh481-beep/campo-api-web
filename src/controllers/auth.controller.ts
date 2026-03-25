@@ -10,7 +10,6 @@ function getClientMetadata(c: Context<AppEnv>) {
 }
 
 export async function postRequestCodigoAcceso(c: Context<AppEnv>) {
-  c.req.valid("json");
   const body = await solicitarCodigoAcceso();
   return c.json(body);
 }

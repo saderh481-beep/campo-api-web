@@ -48,9 +48,10 @@ Los tecnicos tienen un campo `estado_corte` con tres valores posibles:
 - `baja` — dado de baja definitiva.
 
 Logica de bloqueo:
-- En cada request: el middleware verifica que `fecha_limite` de la sesion no haya expirado. Si expiro devuelve `401 { error: "periodo_vencido" }`.
-- En login: si `fecha_limite < NOW()` se actualiza `estado_corte = corte_aplicado` y se rechaza con `401 { error: "periodo_vencido" }`.
-- Extension de periodo: hacer PATCH `/tecnicos/:id` con `fecha_limite` futura resetea automaticamente `estado_corte = en_servicio`.
+- El corte se determina con `configuraciones.fecha_corte_global.valor.fecha` (no por `fecha_limite` individual).
+- En cada request: el middleware valida la fecha de corte global cargada en sesion.
+- En login: si la fecha de corte global ya vencio, se actualiza `estado_corte = corte_aplicado` y se rechaza con `401 { error: "periodo_vencido" }`.
+- Si no existe fecha de corte global configurada, login de tecnicos responde `401 { error: "periodo_no_configurado" }`.
 
 ## Scripts de utilidad
 
@@ -157,8 +158,8 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
 | GET | /usuarios | administrador | - |
-| POST | /usuarios | administrador | { correo, nombre, rol, telefono?, coordinador_id?, fecha_limite? } |
-| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol?, codigo_acceso?, telefono?, coordinador_id?, fecha_limite? } |
+| POST | /usuarios | administrador | { correo, nombre, rol, telefono? } |
+| PATCH | /usuarios/:id | administrador | { nombre?, correo?, rol?, codigo_acceso?, telefono? } |
 | DELETE | /usuarios/:id | administrador | - |
 
 ### Tecnicos
@@ -281,26 +282,42 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 - POST /request-codigo-acceso
   - Body: { correo }
   - Nota: endpoint informativo/compatibilidad; ya no genera codigo por correo.
+  - Respuestas:
+    - 200: { message }
 
 - POST /verify-codigo-acceso
   - Body: { correo, codigo_acceso }
   - Login por compatibilidad.
+  - Respuestas:
+    - 200: { token, usuario }
+    - 401: { error: "Credenciales invalidas" | "periodo_vencido" | "periodo_no_configurado" }
 
 - POST /login
   - Body: { correo, codigo_acceso }
   - Busca usuario activo por correo, compara con hash_codigo_acceso (bcrypt), crea token UUID, guarda sesion en Redis y registra auth_logs login.
   - Respuesta 200:
     - { token, usuario: { id, nombre, correo, rol } }
+  - Respuestas:
+    - 200: { token, usuario }
+    - 401: { error: "Credenciales invalidas" | "periodo_vencido" | "periodo_no_configurado" }
 
 - POST /request-otp
   - Compatibilidad temporal (mismo comportamiento de request-codigo-acceso).
+  - Respuestas:
+    - 200: { message }
 
 - POST /verify-otp
   - Compatibilidad temporal (mismo comportamiento de login).
+  - Respuestas:
+    - 200: { token, usuario }
+    - 401: { error: "Credenciales invalidas" | "periodo_vencido" | "periodo_no_configurado" }
 
 - POST /logout
   - Requiere Bearer token.
   - Elimina session:{token} en Redis y registra auth_logs logout.
+  - Respuestas:
+    - 200: { message: "Sesion cerrada" }
+    - 401: { error }
 
 ### Usuarios (/usuarios)
 
@@ -308,6 +325,8 @@ Requiere rol administrador.
 
 - GET /
   - Lista usuarios (incluye codigo_acceso).
+  - Respuestas:
+    - 200: Usuario[]
 
 - POST /
   - Body:
@@ -315,27 +334,36 @@ Requiere rol administrador.
     - nombre
     - rol: tecnico | coordinador | administrador
     - telefono? (solo tecnico)
-    - coordinador_id? (requerido si rol=tecnico)
-    - fecha_limite? (requerido si rol=tecnico)
   - Crea usuario y genera automaticamente codigo_acceso:
     - tecnico: 5 digitos
     - coordinador/administrador: 6 digitos
   - Guarda codigo_acceso en texto plano y hash_codigo_acceso en bcrypt cost 12.
   - Si rol=tecnico, crea usuario con rol tecnico y su detalle en tecnico_detalles.
   - Respuesta 201 incluye codigo_acceso.
+  - Respuestas:
+    - 201: Usuario
+    - 409: { error: "El correo ya está registrado" }
 
 - PATCH /:id
-  - Body parcial: nombre, correo, rol, codigo_acceso, telefono, coordinador_id, fecha_limite.
+  - Body parcial: nombre, correo, rol, codigo_acceso, telefono.
   - Si se actualiza codigo_acceso, tambien se actualiza hash_codigo_acceso.
   - Si no se envia codigo_acceso, se conserva el hash actual sin recalcular.
   - Valida correo unico entre usuarios activos.
-  - Si rol final es tecnico y se envia coordinador_id, valida que el coordinador exista y este activo.
-  - Si el usuario es tecnico, sincroniza datos en tecnico_detalles cuando corresponde.
+  - El flujo de asignacion de coordinador y fecha limite de tecnico se realiza en /asignaciones/coordinador-tecnico.
+  - Respuestas:
+    - 200: Usuario
+    - 400: { error }
+    - 404: { error: "Usuario no encontrado" }
+    - 409: { error: "El correo ya está registrado" }
 
 - DELETE /:id
   - Soft delete: activo=false, updated_at=NOW().
   - Retorna 404 si el usuario no existe.
   - Si el usuario tiene rol=tecnico, tambien desactiva su registro en tecnico_detalles.
+  - Respuestas:
+    - 200: { message: "Usuario desactivado" }
+    - 400: { error: "No puedes desactivar tu propia cuenta" }
+    - 404: { error: "Usuario no encontrado" }
 
 ### Tecnicos (/tecnicos)
 
@@ -344,14 +372,22 @@ Requiere autenticacion.
 - GET /
   - Roles: administrador, coordinador.
   - Admin ve todos los activos; coordinador solo los suyos.
+  - Respuestas:
+    - 200: Tecnico[]
 
 - GET /:id
   - Roles: administrador, coordinador.
+  - Respuestas:
+    - 200: TecnicoDetalle
+    - 403: { error: "Sin permisos" }
+    - 404: { error: "Técnico no encontrado" }
 
 - POST /
   - Solo administrador.
   - No disponible para crear tecnicos.
   - La alta de tecnicos se realiza en /usuarios con rol=tecnico.
+  - Respuestas:
+    - 409: { error }
 
 - PATCH /:id
   - Solo administrador.
@@ -359,73 +395,115 @@ Requiere autenticacion.
   - Valida correo unico contra usuarios activos.
   - Si cambia coordinador_id, valida que sea un coordinador activo.
   - Sincroniza nombre/correo en la tabla usuarios para mantener consistencia.
-  - Si fecha_limite es una fecha futura, resetea estado_corte a en_servicio automaticamente.
+  - La fecha de corte efectiva se toma desde configuraciones.fecha_corte_global.
+  - Respuestas:
+    - 200: Tecnico
+    - 400: { error }
+    - 404: { error: "Técnico no encontrado" }
+    - 409: { error: "El correo ya está registrado" }
 
 - POST /aplicar-cortes
   - Solo administrador.
-  - Aplica estado_corte=corte_aplicado a todos los tecnicos con fecha_limite vencida y estado en_servicio.
+  - Aplica estado_corte=corte_aplicado a tecnicos cuando la fecha_corte_global ya vencio.
   - Respuesta: lista de tecnicos actualizados.
+  - Respuestas:
+    - 200: { message, tecnicos }
 
 - POST /:id/cerrar-corte
   - Roles: administrador, coordinador.
   - Coordinador solo puede cerrar tecnicos bajo su coordinacion.
   - Aplica estado_corte=corte_aplicado al tecnico indicado.
+  - Respuestas:
+    - 200: { message, tecnico }
+    - 403: { error: "Sin permisos sobre este técnico" }
+    - 404: { error: "Técnico no encontrado" }
 
 - POST /:id/codigo
   - Solo administrador.
   - Genera codigo numerico de 5 digitos para tecnico.
   - Lo guarda en usuarios.codigo_acceso, actualizando usuarios.hash_codigo_acceso.
   - No usa Redis para codigos tecnicos.
+  - Respuestas:
+    - 200: { message, codigo }
+    - 404: { error: "Técnico no encontrado" }
 
 - DELETE /:id
   - Solo administrador.
   - Soft delete tecnico: activo=false, updated_at=NOW().
   - Tambien desactiva el detalle tecnico asociado en tecnico_detalles.
   - Retorna 404 si el técnico no existe.
+  - Respuestas:
+    - 200: { message: "Técnico desactivado" }
+    - 404: { error: "Técnico no encontrado" }
 
 ### Cadenas Productivas (/cadenas-productivas)
 
 - GET /
   - Roles: administrador, coordinador.
+  - Respuestas:
+    - 200: Cadena[]
 
 - POST /
   - Solo administrador.
   - Body: nombre, descripcion?.
+  - Respuestas:
+    - 201: Cadena
 
 - PATCH /:id
   - Solo administrador.
   - Body parcial: nombre, descripcion.
+  - Respuestas:
+    - 200: Cadena
+    - 404: { error: "Cadena no encontrada" }
 
 - DELETE /:id
   - Solo administrador.
   - Soft delete: activo=false, updated_at=NOW().
   - Retorna 404 si la cadena no existe.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error: "Cadena no encontrada" }
 
 ### Actividades (/actividades)
 
 - GET /
   - Roles: administrador, coordinador.
+  - Respuestas:
+    - 200: Actividad[]
 
 - POST /
   - Solo administrador.
   - Body: nombre, descripcion?.
+  - Respuestas:
+    - 201: Actividad
 
 - PATCH /:id
   - Solo administrador.
   - Body parcial: nombre, descripcion.
+  - Respuestas:
+    - 200: Actividad
+    - 404: { error: "Actividad no encontrada" }
 
 - DELETE /:id
   - Solo administrador.
   - Soft delete: activo=false, updated_at=NOW().
   - Retorna 404 si la actividad no existe.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error: "Actividad no encontrada" }
 
 ### Beneficiarios (/beneficiarios)
 
 - GET /
   - Roles: administrador, coordinador.
+  - Respuestas:
+    - 200: Beneficiario[]
 
 - GET /:id
   - Regresa beneficiario con cadenas activas y documentos.
+  - Respuestas:
+    - 200: BeneficiarioDetalle
+    - 404: { error: "Beneficiario no encontrado" }
 
 - POST /
   - Roles: administrador, coordinador.
@@ -442,25 +520,41 @@ Requiere autenticacion.
     - tecnico_id
   - telefonos se almacenan como bytea.
   - coord_parcela se almacena como point.
+  - Respuestas:
+    - 201: Beneficiario
+    - 400: { error }
+    - 403: { error: "Sin permisos para asignar este técnico" }
 
 - PATCH /:id
   - Roles: administrador, coordinador.
   - Body parcial de los mismos campos incluyendo localidad_id.
   - Si se envía tecnico_id, valida que el técnico exista y esté activo.
   - Coordinador solo puede asignar técnicos bajo su coordinación.
+  - Respuestas:
+    - 200: Beneficiario
+    - 400: { error }
+    - 403: { error: "Sin permisos para asignar este técnico" }
+    - 404: { error: "Beneficiario no encontrado" }
 
 - POST /:id/cadenas
   - Solo administrador.
   - Body: { cadena_ids: uuid[] }
   - Actualiza asignaciones usando beneficiario_cadenas.activo (sin delete fisico).
+  - Respuestas:
+    - 200: { message: "Cadenas actualizadas" }
 
 - POST /:id/documentos
   - Roles: administrador, coordinador.
   - FormData: archivo, tipo.
   - Guarda metadata en documentos (r2_key, sha256, bytes, subido_por).
+  - Respuestas:
+    - 201: Documento
+    - 400: { error }
 
 - GET /:id/documentos
   - Lista documentos del beneficiario.
+  - Respuestas:
+    - 200: Documento[]
 
 ### Asignaciones (/asignaciones)
 
@@ -469,18 +563,28 @@ Requiere rol administrador.
 - POST /beneficiario
   - Body: { tecnico_id, beneficiario_id }
   - Crea o reactiva asignacion.
+  - Respuestas:
+    - 201: AsignacionBeneficiario
 
 - DELETE /beneficiario/:id
   - Soft remove: activo=false, removido_en=NOW().
   - Retorna 404 si la asignación no existe.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error }
 
 - POST /actividad
   - Body: { tecnico_id, actividad_id }
   - Crea o reactiva asignacion.
+  - Respuestas:
+    - 201: AsignacionActividad
 
 - DELETE /actividad/:id
   - Soft remove: activo=false, removido_en=NOW().
   - Retorna 404 si la asignación no existe.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error }
 
 ### Bitacoras (/bitacoras)
 
@@ -488,8 +592,13 @@ Requiere roles administrador o coordinador.
 
 - GET /
   - Filtros opcionales: tecnico_id, mes, anio, estado, tipo.
+  - Respuestas:
+    - 200: BitacoraResumen[]
 
 - GET /:id
+  - Respuestas:
+    - 200: Bitacora
+    - 404: { error: "Bitácora no encontrada" }
 
 - PATCH /:id
   - Body opcional:
@@ -498,20 +607,35 @@ Requiere roles administrador o coordinador.
   - Persiste en columnas:
     - observaciones_coordinador
     - actividades_desc
+  - Respuestas:
+    - 200: Bitacora
+    - 404: { error: "Bitácora no encontrada" }
 
 - GET /:id/pdf
   - Render inline PDF.
   - Usa configuracion dinamica desde `configuraciones.clave = 'pdf_encabezado'`.
+  - Respuestas:
+    - 200: application/pdf
+    - 404: { error: "Bitácora no encontrada" }
 
 - GET /:id/pdf/descargar
   - Descarga PDF.
   - Usa configuracion dinamica desde `configuraciones.clave = 'pdf_encabezado'`.
+  - Respuestas:
+    - 200: application/pdf
+    - 404: { error: "Bitácora no encontrada" }
 
 - POST /:id/pdf/imprimir
   - Genera PDF, lo sube y registra version en pdf_versiones.
+  - Respuestas:
+    - 200: application/pdf
+    - 404: { error: "Bitácora no encontrada" }
 
 - GET /:id/versiones
   - Lista versiones PDF.
+  - Respuestas:
+    - 200: PdfVersion[]
+    - 404: { error: "Bitácora no encontrada" }
 
 ### Reportes (/reportes)
 
@@ -520,12 +644,17 @@ Requiere roles administrador o coordinador.
 - GET /mensual
   - Query opcional: mes, anio.
   - Respuesta: resumen por tecnico (cerradas, borradores, total).
+  - Respuestas:
+    - 200: { mes, anio, tecnicos }
 
 - GET /tecnico/:id
   - Query opcional: desde, hasta.
   - Respuesta: detalle de bitacoras del tecnico.
   - Coordinador solo puede consultar técnicos bajo su coordinación.
   - Retorna 404 si el técnico no existe o no tiene permisos.
+  - Respuestas:
+    - 200: { tecnico_id, total, bitacoras }
+    - 404: { error: "Técnico no encontrado o sin permisos" }
 
 ### Notificaciones (/notificaciones)
 
@@ -534,12 +663,18 @@ Cada ruta filtra por destino_id del usuario autenticado.
 
 - GET /
   - Lista no leidas del usuario autenticado.
+  - Respuestas:
+    - 200: Notificacion[]
 
 - PATCH /:id/leer
   - Marca una notificacion como leida.
+  - Respuestas:
+    - 200: { message }
 
 - PATCH /leer-todas
   - Marca todas como leidas para el usuario.
+  - Respuestas:
+    - 200: { message }
 
 ### Localidades (/localidades)
 
@@ -548,19 +683,30 @@ Catalogo manual de localidades por municipio.
 - GET /
   - Roles: administrador, coordinador.
   - Devuelve localidades activas ordenadas por municipio, nombre.
+  - Respuestas:
+    - 200: Localidad[]
 
 - POST /
   - Solo administrador.
   - Body: municipio, nombre, cp? (exactamente 5 digitos).
+  - Respuestas:
+    - 201: Localidad
+    - 400: { error }
 
 - PATCH /:id
   - Solo administrador.
   - Body parcial: municipio, nombre, cp.
   - Solo actualiza localidades activas.
+  - Respuestas:
+    - 200: Localidad
+    - 404: { error: "Localidad no encontrada" }
 
 - DELETE /:id
   - Solo administrador.
   - Soft delete: activo=false.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error: "Localidad no encontrada" }
 
 ### Configuraciones (/configuraciones)
 
@@ -570,15 +716,23 @@ Claves predefinidas: fecha_corte_global, ciclo_nombre, pdf_encabezado.
 - GET /
   - Solo administrador.
   - Lista todas con clave, valor, descripcion, updated_at.
+  - Respuestas:
+    - 200: Configuracion[]
 
 - GET /:clave
   - Roles: administrador, coordinador.
   - Lee una configuracion especifica.
+  - Respuestas:
+    - 200: Configuracion
+    - 404: { error: "Configuración no encontrada" }
 
 - PUT /:clave
   - Solo administrador.
   - Body: { valor: object } — reemplaza el valor JSONB completo.
   - Retorna 404 si la clave no existe.
+  - Respuestas:
+    - 200: Configuracion
+    - 404: { error: "Configuración no encontrada" }
 
 Ejemplo para pdf_encabezado:
 ```json
@@ -599,22 +753,34 @@ Catalogo global de documentos requeridos por beneficiario.
 - GET /activos
   - Roles: administrador, coordinador.
   - Devuelve documentos activos ordenados por orden, nombre.
+  - Respuestas:
+    - 200: DocumentoPlantilla[]
 
 - GET /
   - Solo administrador.
   - Devuelve todos los documentos (activos e inactivos).
+  - Respuestas:
+    - 200: DocumentoPlantilla[]
 
 - POST /
   - Solo administrador.
   - Body: nombre, descripcion?, obligatorio? (default true), orden? (default 0).
+  - Respuestas:
+    - 201: DocumentoPlantilla
 
 - PATCH /:id
   - Solo administrador.
   - Body parcial: nombre, descripcion, obligatorio, orden, activo.
+  - Respuestas:
+    - 200: DocumentoPlantilla
+    - 404: { error: "Documento no encontrado" }
 
 - DELETE /:id
   - Solo administrador.
   - Soft delete: activo=false.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error: "Documento no encontrado" }
 
 ### Archive (/archive)
 
@@ -622,18 +788,31 @@ Requiere rol administrador.
 
 - GET /
   - Lista registros de archive_logs.
+  - Respuestas:
+    - 200: ArchiveLog[]
 
 - GET /:periodo/descargar
   - Descarga el paquete si r2_key_staging contiene URL HTTP(S).
+  - Respuestas:
+    - 200: application/octet-stream
+    - 400: { error }
+    - 404: { error }
+    - 502: { error }
 
 - POST /:periodo/confirmar
   - Body: { confirmar: true }
   - Actualiza el registro mas reciente del periodo a estado=confirmado.
   - Retorna 404 si no existe archivado para ese periodo.
+  - Respuestas:
+    - 200: { message }
+    - 404: { error }
 
 - POST /:periodo/forzar
   - Inserta evento de generacion en archive_logs.
   - Retorna 409 si ya existe un archivado en estado=generando para ese periodo.
+  - Respuestas:
+    - 200: { message }
+    - 409: { error }
 
 ## Codigos de error comunes
 
