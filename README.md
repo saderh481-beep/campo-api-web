@@ -4,21 +4,22 @@ Documentacion actualizada de endpoints expuestos por la API.
 
 ## Base
 - Health: GET /health
+- Health versionado: GET /api/v1/health
 - Prefijos montados:
-  - /auth
-  - /usuarios
-  - /tecnicos
-  - /cadenas-productivas
-  - /actividades
-  - /beneficiarios
-  - /asignaciones
-  - /bitacoras
-  - /reportes
-  - /archive
-  - /notificaciones
-  - /localidades
-  - /configuraciones
-  - /documentos-plantilla
+  - /api/v1/auth
+  - /api/v1/usuarios
+  - /api/v1/tecnicos
+  - /api/v1/cadenas-productivas
+  - /api/v1/actividades
+  - /api/v1/beneficiarios
+  - /api/v1/asignaciones
+  - /api/v1/bitacoras
+  - /api/v1/reportes
+  - /api/v1/archive
+  - /api/v1/notificaciones
+  - /api/v1/localidades
+  - /api/v1/configuraciones
+  - /api/v1/documentos-plantilla
 
 ## Autenticacion
 
@@ -38,6 +39,8 @@ Roles usados por el backend:
 - tecnico
 
 ## Estado de corte (tecnicos)
+
+Nota: La informacion de tecnicos ahora vive en `usuarios` con `rol = 'tecnico'`.
 
 Los tecnicos tienen un campo `estado_corte` con tres valores posibles:
 - `en_servicio` — activo, puede iniciar sesion.
@@ -102,6 +105,8 @@ Variables clave:
 Nota: `.env` ya esta ignorado por Git en `.gitignore`.
 
 ## Endpoints
+
+Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 
 ## Tabla Rapida
 
@@ -285,7 +290,7 @@ Requiere rol administrador.
     - tecnico: 5 digitos
     - coordinador/administrador: 6 digitos
   - Guarda codigo_acceso en texto plano y hash_codigo_acceso en bcrypt cost 12.
-  - Si rol=tecnico, tambien crea/replica el registro en tabla tecnicos con activo=true (visible en GET /tecnicos).
+  - Si rol=tecnico, crea usuario con rol tecnico y su detalle en tecnico_detalles.
   - Respuesta 201 incluye codigo_acceso.
 
 - PATCH /:id
@@ -294,12 +299,12 @@ Requiere rol administrador.
   - Si no se envia codigo_acceso, se conserva el hash actual sin recalcular.
   - Valida correo unico entre usuarios activos.
   - Si rol final es tecnico y se envia coordinador_id, valida que el coordinador exista y este activo.
-  - Si el usuario es tecnico, sincroniza datos en tabla tecnicos.
+  - Si el usuario es tecnico, sincroniza datos en tecnico_detalles cuando corresponde.
 
 - DELETE /:id
   - Soft delete: activo=false, updated_at=NOW().
   - Retorna 404 si el usuario no existe.
-  - Si el usuario tiene rol=tecnico, tambien desactiva el registro en tabla tecnicos.
+  - Si el usuario tiene rol=tecnico, tambien desactiva su registro en tecnico_detalles.
 
 ### Tecnicos (/tecnicos)
 
@@ -338,13 +343,13 @@ Requiere autenticacion.
 - POST /:id/codigo
   - Solo administrador.
   - Genera codigo numerico de 5 digitos para tecnico.
-  - Lo guarda en tecnicos.codigo_acceso y en usuarios.codigo_acceso, actualizando usuarios.hash_codigo_acceso.
+  - Lo guarda en usuarios.codigo_acceso, actualizando usuarios.hash_codigo_acceso.
   - No usa Redis para codigos tecnicos.
 
 - DELETE /:id
   - Solo administrador.
   - Soft delete tecnico: activo=false, updated_at=NOW().
-  - Tambien desactiva el usuario tecnico asociado por correo.
+  - Tambien desactiva el detalle tecnico asociado en tecnico_detalles.
   - Retorna 404 si el técnico no existe.
 
 ### Cadenas Productivas (/cadenas-productivas)

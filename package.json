@@ -7,7 +7,9 @@
     "start": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
     "migrate": "bun run migrate.ts",
-    "schema": "bun run schema.ts"
+    "schema": "bun run schema.ts",
+    "seed:usuarios": "bun run create-users.ts",
+    "seed:admin": "bun run create-admin.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",

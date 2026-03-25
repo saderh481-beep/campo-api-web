@@ -25,7 +25,7 @@ app.get("/", async (c) => {
   let i = 1;
 
   if (user.rol === "coordinador") {
-    condiciones.push(`t.coordinador_id = $${i++}`);
+    condiciones.push(`td.coordinador_id = $${i++}`);
     params.push(user.sub);
   }
   if (tecnico_id) { condiciones.push(`b.tecnico_id = $${i++}`); params.push(tecnico_id); }
@@ -43,11 +43,12 @@ app.get("/", async (c) => {
             cp.nombre AS cadena_nombre,
             a.nombre AS actividad_nombre
      FROM bitacoras b
-     JOIN tecnicos t ON t.id = b.tecnico_id
+     JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+    LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
      LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
      LEFT JOIN cadenas_productivas cp ON cp.id = b.cadena_productiva_id
      LEFT JOIN actividades a ON a.id = b.actividad_id
-     LEFT JOIN usuarios u ON u.id = t.coordinador_id
+    LEFT JOIN usuarios u ON u.id = td.coordinador_id
      ${where}
      ORDER BY b.fecha_inicio DESC
      LIMIT 100`,
@@ -64,8 +65,9 @@ app.get("/:id", async (c) => {
       ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
       : await sql`
           SELECT b.* FROM bitacoras b
-          JOIN tecnicos t ON t.id = b.tecnico_id
-          WHERE b.id = ${id} AND t.coordinador_id = ${user.sub}
+          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
         `;
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
   return c.json(bitacora);
@@ -90,8 +92,9 @@ app.patch(
         ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
         : await sql`
             SELECT b.id FROM bitacoras b
-            JOIN tecnicos t ON t.id = b.tecnico_id
-            WHERE b.id = ${id} AND t.coordinador_id = ${user.sub}
+            JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+            JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
           `;
     if (!pertenece) return c.json({ error: "Bitácora no encontrada" }, 404);
 
@@ -107,14 +110,46 @@ app.patch(
   }
 );
 
+app.patch(
+  "/:id/pdf-config",
+  zValidator("json", z.object({ pdf_edicion: z.record(z.string(), z.unknown()) })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.param();
+    const { pdf_edicion } = c.req.valid("json");
+
+    const [pertenece] =
+      user.rol === "administrador"
+        ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
+        : await sql`
+            SELECT b.id FROM bitacoras b
+            JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+            JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+          `;
+    if (!pertenece) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    const [actualizada] = await sql`
+      UPDATE bitacoras
+      SET pdf_edicion = ${JSON.stringify(pdf_edicion)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING id, pdf_edicion, updated_at
+    `;
+
+    return c.json(actualizada);
+  }
+);
+
 async function obtenerBitacoraConAcceso(id: string, userId: string, rol: string) {
   return rol === "administrador"
     ? (await sql`SELECT * FROM bitacoras WHERE id = ${id}`)[0]
     : (
         await sql`
           SELECT b.* FROM bitacoras b
-          JOIN tecnicos t ON t.id = b.tecnico_id
-          WHERE b.id = ${id} AND t.coordinador_id = ${userId}
+          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+          WHERE b.id = ${id} AND td.coordinador_id = ${userId}
         `
       )[0];
 }
@@ -194,6 +229,10 @@ app.post("/:id/pdf/imprimir", async (c) => {
 
 app.get("/:id/versiones", async (c) => {
   const { id } = c.req.param();
+  const user = c.get("user");
+  const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
+  if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
   const versiones = await sql`
     SELECT id, version, r2_key, sha256, inmutable, generado_por, created_at
     FROM pdf_versiones

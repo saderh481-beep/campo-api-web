@@ -43,8 +43,9 @@ app.get("/", async (c) => {
                          b.coord_parcela, b.activo, b.created_at, b.updated_at
           FROM beneficiarios b
           JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
-          JOIN tecnicos t ON t.id = ab.tecnico_id
-          WHERE t.coordinador_id = ${user.sub} AND ab.activo = true
+          JOIN tecnico_detalles td ON td.tecnico_id = ab.tecnico_id AND td.activo = true
+          JOIN usuarios t ON t.id = ab.tecnico_id
+          WHERE t.rol = 'tecnico' AND td.coordinador_id = ${user.sub} AND t.activo = true AND ab.activo = true
           ORDER BY b.nombre
         `;
   return c.json(beneficiarios);
@@ -95,8 +96,10 @@ app.post(
     }
 
     const [tecnico] = await sql`
-      SELECT id, coordinador_id FROM tecnicos
-      WHERE id = ${body.tecnico_id} AND activo = true
+      SELECT t.id, td.coordinador_id
+      FROM usuarios t
+      LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+      WHERE t.id = ${body.tecnico_id} AND t.rol = 'tecnico' AND t.activo = true
     `;
     if (!tecnico) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
     if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
@@ -146,8 +149,10 @@ app.patch(
 
     if (body.tecnico_id) {
       const [tecnico] = await sql`
-        SELECT id, coordinador_id FROM tecnicos
-        WHERE id = ${body.tecnico_id} AND activo = true
+        SELECT t.id, td.coordinador_id
+        FROM usuarios t
+        LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+        WHERE t.id = ${body.tecnico_id} AND t.rol = 'tecnico' AND t.activo = true
       `;
       if (!tecnico) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
       if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {

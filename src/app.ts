@@ -3,20 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 
-import authRoutes from "@/routes/auth";
-import usuariosRoutes from "@/routes/usuarios";
-import tecnicosRoutes from "@/routes/tecnicos";
-import cadenasRoutes from "@/routes/cadenas";
-import actividadesRoutes from "@/routes/actividades";
-import beneficiariosRoutes from "@/routes/beneficiarios";
-import asignacionesRoutes from "@/routes/asignaciones";
-import bitacorasRoutes from "@/routes/bitacoras";
-import reportesRoutes from "@/routes/reportes";
-import archiveRoutes from "@/routes/archive";
-import notificacionesRoutes from "@/routes/notificaciones";
-import localidadesRoutes from "@/routes/localidades";
-import configuracionesRoutes from "@/routes/configuraciones";
-import documentosPlantillaRoutes from "@/routes/documentos-plantilla";
+import v1Routes from "@/routes/v1";
 
 const app = new Hono();
 
@@ -33,21 +20,9 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ status: "ok", service: "api-web", ts: new Date().toISOString() }));
+app.get("/api/v1/health", (c) => c.json({ status: "ok", service: "api-web", version: "v1", ts: new Date().toISOString() }));
 
-app.route("/auth", authRoutes);
-app.route("/usuarios", usuariosRoutes);
-app.route("/tecnicos", tecnicosRoutes);
-app.route("/cadenas-productivas", cadenasRoutes);
-app.route("/actividades", actividadesRoutes);
-app.route("/beneficiarios", beneficiariosRoutes);
-app.route("/asignaciones", asignacionesRoutes);
-app.route("/bitacoras", bitacorasRoutes);
-app.route("/reportes", reportesRoutes);
-app.route("/archive", archiveRoutes);
-app.route("/notificaciones", notificacionesRoutes);
-app.route("/localidades", localidadesRoutes);
-app.route("/configuraciones", configuracionesRoutes);
-app.route("/documentos-plantilla", documentosPlantillaRoutes);
+app.route("/api/v1", v1Routes);
 
 app.notFound((c) => c.json({ error: "Ruta no encontrada" }, 404));
 app.onError((err, c) => {

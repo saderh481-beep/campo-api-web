@@ -1,22 +1,14 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { sql } from "@/db";
+import { deleteLocalidad, getLocalidades, patchLocalidad, postLocalidad } from "@/controllers/localidades.controller";
 import { authMiddleware, requireRole } from "@/middleware/auth";
-import type { JwtPayload } from "@/lib/jwt";
+import type { AppEnv } from "@/types/http";
 
-const app = new Hono<{ Variables: { user: JwtPayload } }>();
-app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+const app = new Hono<AppEnv>();
+app.use("*", authMiddleware, requireRole("administrador"));
 
-app.get("/", async (_c) => {
-  const localidades = await sql`
-    SELECT id, municipio, nombre, cp, activo, created_at, updated_at
-    FROM localidades
-    WHERE activo = true
-    ORDER BY municipio, nombre
-  `;
-  return _c.json(localidades);
-});
+app.get("/", getLocalidades);
 
 app.post(
   "/",
@@ -24,6 +16,7 @@ app.post(
   zValidator(
     "json",
     z.object({
+      zona_id: z.string().uuid().optional(),
       municipio: z.string().min(2),
       nombre: z.string().min(2),
       cp: z
@@ -32,16 +25,7 @@ app.post(
         .optional(),
     })
   ),
-  async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const [nueva] = await sql`
-      INSERT INTO localidades (municipio, nombre, cp, created_by)
-      VALUES (${body.municipio}, ${body.nombre}, ${body.cp ?? null}, ${user.sub})
-      RETURNING id, municipio, nombre, cp, activo, created_at, updated_at
-    `;
-    return c.json(nueva, 201);
-  }
+  (c) => postLocalidad(c, c.req.valid("json"))
 );
 
 app.patch(
@@ -50,6 +34,7 @@ app.patch(
   zValidator(
     "json",
     z.object({
+      zona_id: z.string().uuid().optional(),
       municipio: z.string().min(2).optional(),
       nombre: z.string().min(2).optional(),
       cp: z
@@ -58,32 +43,9 @@ app.patch(
         .optional(),
     })
   ),
-  async (c) => {
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    const [actualizada] = await sql`
-      UPDATE localidades SET
-        municipio  = COALESCE(${body.municipio ?? null}, municipio),
-        nombre     = COALESCE(${body.nombre ?? null}, nombre),
-        cp         = COALESCE(${body.cp ?? null}, cp),
-        updated_at = NOW()
-      WHERE id = ${id} AND activo = true
-      RETURNING id, municipio, nombre, cp, activo, created_at, updated_at
-    `;
-    if (!actualizada) return c.json({ error: "Localidad no encontrada" }, 404);
-    return c.json(actualizada);
-  }
+  (c) => patchLocalidad(c, c.req.valid("json"))
 );
 
-app.delete("/:id", requireRole("administrador"), async (c) => {
-  const { id } = c.req.param();
-  const [actualizada] = await sql`
-    UPDATE localidades SET activo = false, updated_at = NOW()
-    WHERE id = ${id} AND activo = true
-    RETURNING id
-  `;
-  if (!actualizada) return c.json({ error: "Localidad no encontrada" }, 404);
-  return c.json({ message: "Localidad desactivada" });
-});
+app.delete("/:id", requireRole("administrador"), deleteLocalidad);
 
 export default app;

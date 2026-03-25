@@ -14,6 +14,12 @@ export async function generarPdfBitacora(
   options: PdfOptions = {},
   config: PdfConfig = {}
 ): Promise<Uint8Array> {
+  const edicion =
+    bitacora.pdf_edicion && typeof bitacora.pdf_edicion === "object"
+      ? (bitacora.pdf_edicion as Record<string, unknown>)
+      : {};
+  const bitacoraFinal = { ...bitacora, ...edicion };
+
   const pdfDoc = await PDFDocument.create();
   const margin = options.impresion ? 30 : 50;
   const page = pdfDoc.addPage([595, 842]);
@@ -79,13 +85,13 @@ export async function generarPdfBitacora(
 
   y -= 20;
   const campos: [string, unknown][] = [
-    ["ID", bitacora.id],
-    ["Tipo", bitacora.tipo],
-    ["Estado", bitacora.estado],
-    ["Fecha inicio", bitacora.fecha_inicio],
-    ["Fecha fin", bitacora.fecha_fin ?? "—"],
-    ["Observaciones", bitacora.observaciones_coordinador ?? "—"],
-    ["Actividades realizadas", bitacora.actividades_desc ?? "—"],
+    ["ID", bitacoraFinal.id],
+    ["Tipo", bitacoraFinal.tipo],
+    ["Estado", bitacoraFinal.estado],
+    ["Fecha inicio", bitacoraFinal.fecha_inicio],
+    ["Fecha fin", bitacoraFinal.fecha_fin ?? "—"],
+    ["Observaciones", bitacoraFinal.observaciones_coordinador ?? "—"],
+    ["Actividades realizadas", bitacoraFinal.actividades_desc ?? "—"],
   ];
 
   for (const [label, value] of campos) {
@@ -95,9 +101,9 @@ export async function generarPdfBitacora(
     if (y < margin + 40) break;
   }
 
-  if (bitacora.foto_rostro_url) {
+  if (bitacoraFinal.foto_rostro_url) {
     try {
-      const res = await fetch(String(bitacora.foto_rostro_url));
+      const res = await fetch(String(bitacoraFinal.foto_rostro_url));
       const imgBytes = await res.arrayBuffer();
       const img = await pdfDoc.embedJpg(imgBytes).catch(() => pdfDoc.embedPng(imgBytes));
       page.drawImage(img, { x: width - margin - 100, y: height - margin - 120, width: 90, height: 90 });

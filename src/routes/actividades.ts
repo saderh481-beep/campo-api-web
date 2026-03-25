@@ -1,38 +1,20 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
-import type { JwtPayload } from "@/lib/jwt";
+import type { AppEnv } from "@/types/http";
+import { deleteActividad, getActividades, patchActividad, postActividad } from "@/controllers/actividades.controller";
 
-const app = new Hono<{
-  Variables: {
-    user: JwtPayload
-  }
-}>();
-app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+const app = new Hono<AppEnv>();
+app.use("*", authMiddleware);
 
-app.get("/", async (c) => {
-  const actividades = await sql`
-    SELECT id, nombre, descripcion, activo, created_by, created_at, updated_at FROM actividades ORDER BY nombre
-  `;
-  return c.json(actividades);
-});
+app.get("/", requireRole("administrador", "coordinador"), getActividades);
 
 app.post(
   "/",
   requireRole("administrador"),
   zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
-  async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const [nueva] = await sql`
-      INSERT INTO actividades (nombre, descripcion, created_by)
-      VALUES (${body.nombre}, ${body.descripcion ?? null}, ${user.sub})
-      RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
-    `;
-    return c.json(nueva, 201);
-  }
+  (c) => postActividad(c, c.req.valid("json"))
 );
 
 app.patch(
@@ -42,30 +24,9 @@ app.patch(
     "json",
     z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional() })
   ),
-  async (c) => {
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    const [actualizado] = await sql`
-      UPDATE actividades SET
-        nombre      = COALESCE(${body.nombre ?? null}, nombre),
-        descripcion = COALESCE(${body.descripcion ?? null}, descripcion),
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
-    `;
-    if (!actualizado) return c.json({ error: "Actividad no encontrada" }, 404);
-    return c.json(actualizado);
-  }
+  (c) => patchActividad(c, c.req.valid("json"))
 );
 
-app.delete("/:id", requireRole("administrador"), async (c) => {
-  const { id } = c.req.param();
-  const [actualizada] = await sql`
-    UPDATE actividades SET activo = false, updated_at = NOW() WHERE id = ${id}
-    RETURNING id
-  `;
-  if (!actualizada) return c.json({ error: "Actividad no encontrada" }, 404);
-  return c.json({ message: "Actividad desactivada" });
-});
+app.delete("/:id", requireRole("administrador"), deleteActividad);
 
 export default app;

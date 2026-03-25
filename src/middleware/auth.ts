@@ -1,17 +1,9 @@
 import { createMiddleware } from "hono/factory";
 import { redis } from "@/lib/redis";
 import type { JwtPayload } from "@/lib/jwt";
+import type { AppEnv, SessionPayload } from "@/types/http";
 
-type SessionPayload = {
-  usuario_id: string;
-  rol: JwtPayload["rol"];
-  nombre: string;
-  correo: string;
-  created_at: string;
-  fecha_limite?: string; // presente solo para tecnicos
-};
-
-type Env = { Variables: { user: JwtPayload; sessionToken: string } };
+type Env = AppEnv & { Variables: { user: JwtPayload; sessionToken: string } };
 
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization") ?? "";

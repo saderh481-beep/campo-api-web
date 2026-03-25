@@ -1,16 +1,37 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
-import type { JwtPayload } from "@/lib/jwt";
+import type { AppEnv } from "@/types/http";
+import {
+  deleteAsignacionActividad,
+  deleteAsignacionBeneficiario,
+  deleteAsignacionCoordinadorTecnico,
+  getAsignacionCoordinadorTecnico,
+  postAsignacionActividad,
+  postAsignacionBeneficiario,
+  postAsignacionCoordinadorTecnico,
+} from "@/controllers/asignaciones.controller";
 
-const app = new Hono<{
-  Variables: {
-    user: JwtPayload
-  }
-}>();
+const app = new Hono<AppEnv>();
 app.use("*", authMiddleware, requireRole("administrador"));
+
+app.get("/coordinador-tecnico", getAsignacionCoordinadorTecnico);
+
+app.post(
+  "/coordinador-tecnico",
+  zValidator(
+    "json",
+    z.object({
+      tecnico_id: z.string().uuid(),
+      coordinador_id: z.string().uuid(),
+      fecha_limite: z.string().datetime(),
+    })
+  ),
+  (c) => postAsignacionCoordinadorTecnico(c, c.req.valid("json"))
+);
+
+app.delete("/coordinador-tecnico/:tecnico_id", deleteAsignacionCoordinadorTecnico);
 
 app.post(
   "/beneficiario",
@@ -18,45 +39,10 @@ app.post(
     "json",
     z.object({ tecnico_id: z.string().uuid(), beneficiario_id: z.string().uuid() })
   ),
-  async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const [existente] = await sql`
-      SELECT id
-      FROM asignaciones_beneficiario
-      WHERE tecnico_id = ${body.tecnico_id} AND beneficiario_id = ${body.beneficiario_id}
-      ORDER BY asignado_en DESC
-      LIMIT 1
-    `;
-
-    const [nueva] = existente
-      ? await sql`
-          UPDATE asignaciones_beneficiario
-          SET activo = true, removido_en = NULL
-          WHERE id = ${existente.id}
-          RETURNING id, tecnico_id, beneficiario_id, activo, asignado_por, asignado_en, removido_en
-        `
-      : await sql`
-          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-          VALUES (${body.tecnico_id}, ${body.beneficiario_id}, ${user.sub})
-          RETURNING id, tecnico_id, beneficiario_id, activo, asignado_por, asignado_en, removido_en
-        `;
-
-    return c.json(nueva, 201);
-  }
+  (c) => postAsignacionBeneficiario(c, c.req.valid("json"))
 );
 
-app.delete("/beneficiario/:id", async (c) => {
-  const { id } = c.req.param();
-  const [actualizada] = await sql`
-    UPDATE asignaciones_beneficiario
-    SET activo = false, removido_en = NOW()
-    WHERE id = ${id}
-    RETURNING id
-  `;
-  if (!actualizada) return c.json({ error: "Asignación no encontrada" }, 404);
-  return c.json({ message: "Asignación removida" });
-});
+app.delete("/beneficiario/:id", deleteAsignacionBeneficiario);
 
 app.post(
   "/actividad",
@@ -64,44 +50,9 @@ app.post(
     "json",
     z.object({ tecnico_id: z.string().uuid(), actividad_id: z.string().uuid() })
   ),
-  async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const [existente] = await sql`
-      SELECT id
-      FROM asignaciones_actividad
-      WHERE tecnico_id = ${body.tecnico_id} AND actividad_id = ${body.actividad_id}
-      ORDER BY asignado_en DESC
-      LIMIT 1
-    `;
-
-    const [nueva] = existente
-      ? await sql`
-          UPDATE asignaciones_actividad
-          SET activo = true, removido_en = NULL
-          WHERE id = ${existente.id}
-          RETURNING id, tecnico_id, actividad_id, activo, asignado_por, asignado_en, removido_en
-        `
-      : await sql`
-          INSERT INTO asignaciones_actividad (tecnico_id, actividad_id, asignado_por)
-          VALUES (${body.tecnico_id}, ${body.actividad_id}, ${user.sub})
-          RETURNING id, tecnico_id, actividad_id, activo, asignado_por, asignado_en, removido_en
-        `;
-
-    return c.json(nueva, 201);
-  }
+  (c) => postAsignacionActividad(c, c.req.valid("json"))
 );
 
-app.delete("/actividad/:id", async (c) => {
-  const { id } = c.req.param();
-  const [actualizada] = await sql`
-    UPDATE asignaciones_actividad
-    SET activo = false, removido_en = NOW()
-    WHERE id = ${id}
-    RETURNING id
-  `;
-  if (!actualizada) return c.json({ error: "Asignación de actividad no encontrada" }, 404);
-  return c.json({ message: "Asignación de actividad removida" });
-});
+app.delete("/actividad/:id", deleteAsignacionActividad);
 
 export default app;
