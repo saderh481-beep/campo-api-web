@@ -213,6 +213,9 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
+| GET | /asignaciones/coordinador-tecnico?tecnico_id=uuid | administrador | - |
+| POST | /asignaciones/coordinador-tecnico | administrador | { tecnico_id, coordinador_id, fecha_limite } |
+| DELETE | /asignaciones/coordinador-tecnico/:tecnico_id | administrador | - |
 | POST | /asignaciones/beneficiario | administrador | { tecnico_id, beneficiario_id } |
 | DELETE | /asignaciones/beneficiario/:id | administrador | - |
 | POST | /asignaciones/actividad | administrador | { tecnico_id, actividad_id } |
@@ -225,6 +228,7 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | GET | /bitacoras | administrador, coordinador | Query opcional: tecnico_id, mes, anio, estado, tipo |
 | GET | /bitacoras/:id | administrador, coordinador | - |
 | PATCH | /bitacoras/:id | administrador, coordinador | { observaciones?, actividades_realizadas? } |
+| PATCH | /bitacoras/:id/pdf-config | administrador, coordinador | { pdf_edicion: object } |
 | GET | /bitacoras/:id/pdf | administrador, coordinador | - |
 | GET | /bitacoras/:id/pdf/descargar | administrador, coordinador | - |
 | POST | /bitacoras/:id/pdf/imprimir | administrador, coordinador | - |
@@ -280,6 +284,30 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | GET | /archive/:periodo/descargar | administrador | - |
 | POST | /archive/:periodo/confirmar | administrador | { confirmar: true } |
 | POST | /archive/:periodo/forzar | administrador | - |
+
+### Zonas
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /zonas | administrador | - |
+| POST | /zonas | administrador | { nombre } |
+| PATCH | /zonas/:id | administrador | { nombre?, descripcion? } |
+| DELETE | /zonas/:id | administrador | - |
+
+### Documentos PDF
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /documentos-pdf | administrador | - |
+| POST | /documentos-pdf | administrador | FormData(archivo, clave, nombre, descripcion?) |
+| PATCH | /documentos-pdf/:id | administrador | { clave?, nombre?, descripcion?, activo? } |
+| DELETE | /documentos-pdf/:id | administrador | - |
+
+### Dashboard
+
+| Metodo | Ruta | Rol | Body minimo |
+|---|---|---|---|
+| GET | /dashboard/coordinador | coordinador | - |
 
 ### Auth (/auth)
 
@@ -564,6 +592,33 @@ Requiere autenticacion.
 
 Requiere rol administrador.
 
+- GET /coordinador-tecnico?tecnico_id=uuid
+  - Lee la asignación coordinador-técnico de un técnico.
+  - Query param requerido: tecnico_id (uuid).
+  - Respuestas:
+    - 200: TecnicoDetalle (incluye coordinador_id y fecha_limite)
+    - 400: { error: "tecnico_id es requerido" }
+    - 404: { error: "Asignación no encontrada" }
+
+- POST /coordinador-tecnico
+  - Asigna o reasigna coordinador a un técnico y establece la fecha límite individual.
+  - Body:
+    - tecnico_id (uuid, requerido)
+    - coordinador_id (uuid, requerido)
+    - fecha_limite (ISO datetime, requerido)
+  - Valida que coordinador sea un usuario activo con rol coordinador.
+  - Valida que técnico sea un usuario activo con rol tecnico.
+  - Respuestas:
+    - 201: TecnicoDetalle
+    - 400: { error: "Coordinador inválido o inactivo" }
+    - 400: { error: "Técnico inválido o inactivo" }
+
+- DELETE /coordinador-tecnico/:tecnico_id
+  - Elimina la asignación coordinador-técnico del técnico indicado.
+  - Respuestas:
+    - 200: { message: "Asignación removida" }
+    - 404: { error: "Asignación no encontrada" }
+
 - POST /beneficiario
   - Body: { tecnico_id, beneficiario_id }
   - Crea o reactiva asignacion.
@@ -613,6 +668,14 @@ Requiere roles administrador o coordinador.
     - actividades_desc
   - Respuestas:
     - 200: Bitacora
+    - 404: { error: "Bitácora no encontrada" }
+
+- PATCH /:id/pdf-config
+  - Roles: administrador, coordinador.
+  - Guarda configuracion de edicion de PDF para la bitacora.
+  - Body: { pdf_edicion: object } — objeto JSONB libre (colores, margenes, etc.).
+  - Respuestas:
+    - 200: { id, pdf_edicion, updated_at }
     - 404: { error: "Bitácora no encontrada" }
 
 - GET /:id/pdf
@@ -692,14 +755,19 @@ Catalogo manual de localidades por municipio.
 
 - POST /
   - Solo administrador.
-  - Body: municipio, nombre, cp? (exactamente 5 digitos).
+  - Body:
+    - zona_id? (uuid FK a tabla zonas)
+    - municipio
+    - nombre
+    - cp? (exactamente 5 digitos)
   - Respuestas:
     - 201: Localidad
+    - 400: { error: "Zona no encontrada" }
     - 400: { error }
 
 - PATCH /:id
   - Solo administrador.
-  - Body parcial: municipio, nombre, cp.
+  - Body parcial: zona_id, municipio, nombre, cp.
   - Solo actualiza localidades activas.
   - Respuestas:
     - 200: Localidad
@@ -817,6 +885,93 @@ Requiere rol administrador.
   - Respuestas:
     - 200: { message }
     - 409: { error }
+
+### Zonas (/zonas)
+
+Requiere rol administrador.
+
+- GET /
+  - Lista zonas activas.
+  - Respuestas:
+    - 200: Zona[]
+
+- POST /
+  - Body: nombre (min 2 chars), descripcion?.
+  - Respuestas:
+    - 201: Zona
+    - 400: { error }
+
+- PATCH /:id
+  - Body parcial: nombre, descripcion.
+  - Respuestas:
+    - 200: Zona
+    - 404: { error: "Zona no encontrada" }
+
+- DELETE /:id
+  - Soft delete: activo=false.
+  - Respuestas:
+    - 200: { message: "Zona desactivada" }
+    - 404: { error: "Zona no encontrada" }
+
+### Documentos PDF (/documentos-pdf)
+
+Requiere rol administrador.
+
+- GET /
+  - Lista todos los documentos PDF configurados.
+  - Respuestas:
+    - 200: DocumentoPdf[]
+
+- POST /
+  - FormData: archivo (file), clave (string), nombre (string), descripcion? (string).
+  - Sube el archivo a Cloudinary y registra metadata en BD.
+  - Respuestas:
+    - 201: DocumentoPdf
+    - 400: { error: "archivo, clave y nombre son requeridos" }
+
+- PATCH /:id
+  - Body parcial: clave, nombre, descripcion, activo.
+  - Respuestas:
+    - 200: DocumentoPdf
+    - 404: { error: "Documento no encontrado" }
+
+- DELETE /:id
+  - Soft delete: activo=false.
+  - Respuestas:
+    - 200: { message: "Documento PDF desactivado" }
+    - 404: { error: "Documento no encontrado" }
+
+### Dashboard (/dashboard)
+
+- GET /coordinador
+  - Requiere rol coordinador.
+  - Retorna metricas del coordinador autenticado: conteo de tecnicos, beneficiarios y bitacoras bajo su coordinacion.
+  - Respuestas:
+    - 200:
+      ```json
+      {
+        "resumen": {
+          "tecnicos": 3,
+          "beneficiarios": 12,
+          "bitacoras": 45,
+          "bitacoras_cerradas": 30,
+          "bitacoras_borrador": 15
+        },
+        "tecnicos": [
+          {
+            "id": "uuid",
+            "nombre": "string",
+            "correo": "string",
+            "telefono": "string",
+            "fecha_limite": "ISO date",
+            "estado_corte": "en_servicio|corte_aplicado|baja",
+            "total_beneficiarios": 4,
+            "total_bitacoras": 15
+          }
+        ]
+      }
+      ```
+    - 401: { error }
 
 ## Codigos de error comunes
 
