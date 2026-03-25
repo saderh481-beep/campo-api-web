@@ -58,6 +58,11 @@ Logica de bloqueo:
 # Aplicar migraciones pendientes a la base de datos
 bun run migrate
 
+# Crear/actualizar usuarios base (1 admin, 1 coordinador, 3 tecnicos)
+bun run create-users.ts
+# o por npm script
+npm run seed:usuarios
+
 # Inspeccionar estructura actual de todas las tablas en la BD
 bun run schema
 
@@ -71,7 +76,7 @@ bun run typecheck
 - Usuarios (PATCH): `hash_codigo_acceso` solo se recalcula cuando se envia `codigo_acceso` nuevo.
 - Archive: `POST /archive/:periodo/confirmar` ahora actualiza el registro mas reciente del periodo (no inserta un duplicado).
 - Archive: `POST /archive/:periodo/forzar` retorna `409` si ya existe un archivado en progreso para ese periodo.
-- Notificaciones: accesibles para cualquier usuario autenticado (incluye tecnico), siempre filtradas por `destino_id`.
+- Notificaciones: accesibles para administrador y tecnico autenticados, siempre filtradas por `destino_id`.
 - Actividades (PATCH): `created_by` ya no es editable desde API.
 
 ## Arranque rapido
@@ -79,6 +84,12 @@ bun run typecheck
 ```bash
 # Instalar dependencias
 bun install
+
+# Aplicar migraciones
+npm run migrate
+
+# Crear usuarios base
+npm run seed:usuarios
 
 # Levantar API en modo desarrollo (watch)
 bun run dev
@@ -103,6 +114,26 @@ Variables clave:
 - `PORT`, `WEB_ORIGIN`, `NODE_ENV`
 
 Nota: `.env` ya esta ignorado por Git en `.gitignore`.
+
+## Seed de usuarios base
+
+El script `create-users.ts` realiza upsert idempotente sobre `usuarios` y crea/actualiza el detalle tecnico en `tecnico_detalles` (si la tabla existe).
+
+Credenciales por defecto:
+- administrador: admin@campo.local / 654321
+- coordinador: coordinador@campo.local / 654322
+- tecnico: tecnico1@campo.local / 12345
+- tecnico: tecnico2@campo.local / 12346
+- tecnico: tecnico3@campo.local / 12347
+
+Variables de entorno opcionales para personalizar correos/nombres/codigos:
+- `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_CODIGO`
+- `COORD_EMAIL`, `COORD_NAME`, `COORD_CODIGO`
+- `TECNICO1_EMAIL`, `TECNICO1_NAME`, `TECNICO1_CODIGO`
+- `TECNICO2_EMAIL`, `TECNICO2_NAME`, `TECNICO2_CODIGO`
+- `TECNICO3_EMAIL`, `TECNICO3_NAME`, `TECNICO3_CODIGO`
+
+Compatibilidad: `create-admin.ts` sigue existiendo como alias y redirige a `create-users.ts`.
 
 ## Endpoints
 
@@ -205,9 +236,9 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
-| GET | /notificaciones | todos (autenticado) | - |
-| PATCH | /notificaciones/:id/leer | todos (autenticado) | - |
-| PATCH | /notificaciones/leer-todas | todos (autenticado) | - |
+| GET | /notificaciones | administrador, tecnico | - |
+| PATCH | /notificaciones/:id/leer | administrador, tecnico | - |
+| PATCH | /notificaciones/leer-todas | administrador, tecnico | - |
 
 ### Localidades
 
