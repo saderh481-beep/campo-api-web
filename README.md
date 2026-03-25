@@ -138,6 +138,10 @@ Compatibilidad: `create-admin.ts` sigue existiendo como alias y redirige a `crea
 
 ## Endpoints
 
+Contrato recomendado para frontend (request/response/error por endpoint):
+
+- Ver API_ENDPOINTS.md
+
 Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 
 ## Tabla Rapida
