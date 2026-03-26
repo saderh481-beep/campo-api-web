@@ -276,6 +276,7 @@ Success:
 Errors:
 - 400: `{ "error": "tecnico_id es requerido" }`
 - 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ### POST /asignaciones/coordinador-tecnico
 Asigna o reasigna coordinador a un técnico. Valida que coordinador y técnico existan y estén activos.
@@ -303,6 +304,7 @@ Success:
 
 Errors:
 - 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ### POST /asignaciones/beneficiario
 Asigna o reactiva una asignación de beneficiario a técnico. Si ya existía una asignación previa para esa pareja, la reactiva en lugar de insertar un duplicado. Valida que el técnico y el beneficiario existan y estén activos.
@@ -329,6 +331,7 @@ Success:
 
 Errors:
 - 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ### POST /asignaciones/actividad
 Asigna o reactiva una actividad a un técnico. Valida que tanto el técnico como la actividad existan y estén activos.
@@ -355,6 +358,7 @@ Success:
 
 Errors:
 - 404: `{ "error": "Asignación de actividad no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ## Beneficiarios
 Roles: administrador, coordinador
@@ -404,7 +408,7 @@ Shape `BeneficiarioDetalle` (incluye relaciones):
 
 ### GET /beneficiarios
 Devuelve lista de beneficiarios.
-- Administrador: todos los beneficiarios.
+- Administrador: todos los beneficiarios activos.
 - Coordinador: solo los beneficiarios cuyo `tecnico_id` pertenece a un técnico activo bajo su coordinación.
 
 Ordenados por `nombre`.
@@ -415,6 +419,8 @@ Success:
 ### GET /beneficiarios/:id
 Devuelve datos del beneficiario junto con cadenas productivas activas y documentos.
 - Coordinador: solo puede consultar beneficiarios de sus técnicos (devuelve 404 si no pertenece).
+
+Nota: solo devuelve beneficiarios activos.
 
 Success:
 - 200: `BeneficiarioDetalle`
@@ -493,12 +499,15 @@ Success:
 - 200: `{ "message": "Cadenas actualizadas" }`
 
 Errors:
+- 400: `{ "error": "Una o más cadenas no existen o están inactivas" }`
 - 404: `{ "error": "Beneficiario no encontrado" }`
 - 422: error de validación
 
 ### POST /beneficiarios/:id/documentos
 Sube un documento al beneficiario. Lo almacena en Cloudinary y guarda la metadata en la tabla `documentos`.
 - Coordinador: solo puede subir documentos a beneficiarios de sus técnicos.
+
+Nota: solo permite documentos en beneficiarios activos.
 
 Request: `multipart/form-data`
 - `archivo` (File, requerido): archivo a subir.
@@ -526,6 +535,8 @@ Errors:
 ### GET /beneficiarios/:id/documentos
 Lista documentos del beneficiario.
 - Coordinador: solo puede listar documentos de beneficiarios de sus técnicos.
+
+Nota: solo lista documentos de beneficiarios activos.
 
 Success:
 - 200: Documento[] (mismo shape que el body de POST /documentos)
@@ -615,7 +626,9 @@ Success:
 
 ### PATCH /notificaciones/:id/leer
 Success:
-- 200: { "message": "Marcada como leída" }
+- 200: `{ "message": "Marcada como leída", "notificacion": { "id": "uuid", "destino_id": "uuid", "tipo": "string", "titulo": "string", "leido": true, "created_at": "ISO datetime" } }`
+Errors:
+- 404: `{ "error": "Notificación no encontrada" }`
 
 ### PATCH /notificaciones/leer-todas
 Success:
@@ -652,7 +665,73 @@ Role: administrador
 Success:
 - 200: { "message": "Localidad desactivada" }
 Errors:
-- 404
+- 404: `{ "error": "Localidad no encontrada" }`
+- 409: `{ "error": "No se puede desactivar una localidad con beneficiarios activos" }`
+
+## Cadenas Productivas
+Role required: administrador
+
+### GET /cadenas-productivas
+Success:
+- 200: Cadena[] (solo activas)
+
+### POST /cadenas-productivas
+Request body:
+```json
+{ "nombre": "string", "descripcion": "string?" }
+```
+Success:
+- 201: Cadena
+
+### PATCH /cadenas-productivas/:id
+Request body:
+```json
+{ "nombre": "string?", "descripcion": "string?" }
+```
+Success:
+- 200: Cadena
+Errors:
+- 404: `{ "error": "Cadena no encontrada" }`
+
+### DELETE /cadenas-productivas/:id
+Success:
+- 200: `{ "message": "Cadena desactivada" }`
+Errors:
+- 404: `{ "error": "Cadena no encontrada" }`
+
+## Actividades
+
+### GET /actividades
+Roles: administrador, coordinador
+Success:
+- 200: Actividad[] (solo activas)
+
+### POST /actividades
+Role: administrador
+Request body:
+```json
+{ "nombre": "string", "descripcion": "string?" }
+```
+Success:
+- 201: Actividad
+
+### PATCH /actividades/:id
+Role: administrador
+Request body:
+```json
+{ "nombre": "string?", "descripcion": "string?" }
+```
+Success:
+- 200: Actividad
+Errors:
+- 404: `{ "error": "Actividad no encontrada" }`
+
+### DELETE /actividades/:id
+Role: administrador
+Success:
+- 200: `{ "message": "Actividad desactivada" }`
+Errors:
+- 404: `{ "error": "Actividad no encontrada" }`
 
 ## Zonas
 Role required: administrador
@@ -765,6 +844,7 @@ Success:
 - 201: DocumentoPdf
 Errors:
 - 400: { "error": "archivo, clave y nombre son requeridos" }
+- 400: { "error": "El archivo debe ser PDF" }
 
 ### PATCH /documentos-pdf/:id
 Request body:
@@ -793,7 +873,11 @@ Success:
 Success:
 - 200: application/octet-stream
 Errors:
-- 400, 404, 502
+- 400: { "error": "No hay URL de descarga disponible" }
+- 404: { "error": "Paquete no disponible" }
+- 413: { "error": "Archivo demasiado grande" }
+- 502: { "error": "Error al obtener el archivo" }
+- 422: error de validación (periodo inválido, formato esperado `YYYY-MM`)
 
 ### POST /archive/:periodo/confirmar
 Request body:
@@ -803,13 +887,15 @@ Request body:
 Success:
 - 200: { "message": string }
 Errors:
-- 404
+- 404: { "error": "No se encontró archivado para ese periodo" }
+- 422: error de validación (periodo inválido, formato esperado `YYYY-MM`)
 
 ### POST /archive/:periodo/forzar
 Success:
 - 200: { "message": string }
 Errors:
-- 409
+- 409: { "error": "Ya existe un archivado en progreso para ese periodo" }
+- 422: error de validación (periodo inválido, formato esperado `YYYY-MM`)
 
 ## Dashboard
 

@@ -86,6 +86,13 @@ bun run typecheck
 - Usuarios (POST): la validacion de correo duplicado ahora solo bloquea si existe otro usuario **activo** con ese correo (permite reutilizar correos de usuarios eliminados).
 - Asignaciones (POST /beneficiario y POST /actividad): ahora validan que el tecnico y la entidad destino existan y esten activos antes de insertar. Errores: `400 tecnico invalido`, `404 beneficiario/actividad no encontrado`.
 - Beneficiarios (POST y PATCH): la creacion y reasignacion de tecnico ahora ocurre en una transaccion atomica junto con `asignaciones_beneficiario`, eliminando posibles registros huerfanos.
+- Beneficiarios: `GET /beneficiarios`, `GET /beneficiarios/:id` y endpoints de documentos/cadenas ahora operan solo sobre beneficiarios activos.
+- Beneficiarios cadenas: `POST /beneficiarios/:id/cadenas` valida que todos los `cadena_ids` existan y esten activos (si no, responde `400`).
+- Cadenas productivas y actividades: listados y operaciones de edicion/baja ahora se aplican solo a registros activos (soft-delete consistente).
+- Localidades: `DELETE /localidades/:id` ahora bloquea con `409` si la localidad tiene beneficiarios activos referenciandola.
+- Archive: rutas con `:periodo` ahora validan formato `YYYY-MM`; descarga agrega timeout y limite de tamano (puede responder `413`).
+- Documentos PDF: `POST /documentos-pdf` ahora valida que el archivo sea PDF.
+- Asignaciones: rutas de consulta/eliminacion por id agregan validacion UUID en params/query.
 
 ## Arranque rapido
 
@@ -220,13 +227,13 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
-| GET | /asignaciones/coordinador-tecnico?tecnico_id=uuid | administrador | - |
+| GET | /asignaciones/coordinador-tecnico?tecnico_id=uuid | administrador | Query UUID requerido |
 | POST | /asignaciones/coordinador-tecnico | administrador | { tecnico_id, coordinador_id, fecha_limite } |
-| DELETE | /asignaciones/coordinador-tecnico/:tecnico_id | administrador | - |
+| DELETE | /asignaciones/coordinador-tecnico/:tecnico_id | administrador | Param UUID requerido |
 | POST | /asignaciones/beneficiario | administrador | { tecnico_id, beneficiario_id } |
-| DELETE | /asignaciones/beneficiario/:id | administrador | - |
+| DELETE | /asignaciones/beneficiario/:id | administrador | Param UUID requerido |
 | POST | /asignaciones/actividad | administrador | { tecnico_id, actividad_id } |
-| DELETE | /asignaciones/actividad/:id | administrador | - |
+| DELETE | /asignaciones/actividad/:id | administrador | Param UUID requerido |
 
 ### Bitacoras
 
@@ -263,7 +270,7 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | GET | /localidades | administrador, coordinador | - |
 | POST | /localidades | administrador | { municipio, nombre, cp? } |
 | PATCH | /localidades/:id | administrador | { municipio?, nombre?, cp? } |
-| DELETE | /localidades/:id | administrador | - |
+| DELETE | /localidades/:id | administrador | - (puede responder 409 si tiene beneficiarios activos) |
 
 ### Configuraciones
 
@@ -288,9 +295,9 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
 | GET | /archive | administrador | - |
-| GET | /archive/:periodo/descargar | administrador | - |
+| GET | /archive/:periodo/descargar | administrador | Param `periodo` formato YYYY-MM |
 | POST | /archive/:periodo/confirmar | administrador | { confirmar: true } |
-| POST | /archive/:periodo/forzar | administrador | - |
+| POST | /archive/:periodo/forzar | administrador | Param `periodo` formato YYYY-MM |
 
 ### Zonas
 
@@ -306,7 +313,7 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
 | GET | /documentos-pdf | administrador | - |
-| POST | /documentos-pdf | administrador | FormData(archivo, clave, nombre, descripcion?) |
+| POST | /documentos-pdf | administrador | FormData(archivo PDF, clave, nombre, descripcion?) |
 | PATCH | /documentos-pdf/:id | administrador | { clave?, nombre?, descripcion?, activo? } |
 | DELETE | /documentos-pdf/:id | administrador | - |
 
