@@ -88,6 +88,8 @@ bun run typecheck
 - Beneficiarios (POST y PATCH): la creacion y reasignacion de tecnico ahora ocurre en una transaccion atomica junto con `asignaciones_beneficiario`, eliminando posibles registros huerfanos.
 - Beneficiarios: `GET /beneficiarios`, `GET /beneficiarios/:id` y endpoints de documentos/cadenas ahora operan solo sobre beneficiarios activos.
 - Beneficiarios cadenas: `POST /beneficiarios/:id/cadenas` valida que todos los `cadena_ids` existan y esten activos (si no, responde `400`).
+- Beneficiarios: se agrego `DELETE /beneficiarios/:id` (soft-delete) y al desactivar tambien se cierran asignaciones activas en `asignaciones_beneficiario`.
+- Beneficiarios: `POST` y `PATCH` validan `localidad_id` contra localidades activas para evitar errores de FK en base de datos.
 - Cadenas productivas y actividades: listados y operaciones de edicion/baja ahora se aplican solo a registros activos (soft-delete consistente).
 - Localidades: `DELETE /localidades/:id` ahora bloquea con `409` si la localidad tiene beneficiarios activos referenciandola.
 - Archive: rutas con `:periodo` ahora validan formato `YYYY-MM`; descarga agrega timeout y limite de tamano (puede responder `413`).
@@ -219,6 +221,7 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | GET | /beneficiarios/:id | administrador, coordinador | - |
 | POST | /beneficiarios | administrador, coordinador | { nombre, municipio, tecnico_id, localidad_id? } |
 | PATCH | /beneficiarios/:id | administrador, coordinador | { nombre?, municipio?, localidad?, localidad_id?, direccion?, cp?, telefono_principal?, telefono_secundario?, coord_parcela?, tecnico_id? } |
+| DELETE | /beneficiarios/:id | administrador, coordinador | - |
 | POST | /beneficiarios/:id/cadenas | administrador | { cadena_ids: uuid[] } |
 | POST | /beneficiarios/:id/documentos | administrador, coordinador | FormData(archivo, tipo) |
 | GET | /beneficiarios/:id/documentos | administrador, coordinador | - |
@@ -228,11 +231,20 @@ Todas las rutas de esta seccion usan el prefijo base `/api/v1`.
 | Metodo | Ruta | Rol | Body minimo |
 |---|---|---|---|
 | GET | /asignaciones/coordinador-tecnico?tecnico_id=uuid | administrador | Query UUID requerido |
+| GET | /asignaciones/coordinador-tecnico/lista | administrador | Query opcional: tecnico_id |
+| GET | /asignaciones/coordinador-tecnico/:tecnico_id | administrador | - |
 | POST | /asignaciones/coordinador-tecnico | administrador | { tecnico_id, coordinador_id, fecha_limite } |
+| PATCH | /asignaciones/coordinador-tecnico/:tecnico_id | administrador | { coordinador_id?, fecha_limite?, activo? } |
 | DELETE | /asignaciones/coordinador-tecnico/:tecnico_id | administrador | Param UUID requerido |
+| GET | /asignaciones/beneficiario | administrador | Query opcional: tecnico_id, beneficiario_id, activo |
+| GET | /asignaciones/beneficiario/:id | administrador | - |
 | POST | /asignaciones/beneficiario | administrador | { tecnico_id, beneficiario_id } |
+| PATCH | /asignaciones/beneficiario/:id | administrador | { tecnico_id?, beneficiario_id?, activo? } |
 | DELETE | /asignaciones/beneficiario/:id | administrador | Param UUID requerido |
+| GET | /asignaciones/actividad | administrador | Query opcional: tecnico_id, actividad_id, activo |
+| GET | /asignaciones/actividad/:id | administrador | - |
 | POST | /asignaciones/actividad | administrador | { tecnico_id, actividad_id } |
+| PATCH | /asignaciones/actividad/:id | administrador | { tecnico_id?, actividad_id?, activo? } |
 | DELETE | /asignaciones/actividad/:id | administrador | Param UUID requerido |
 
 ### Bitacoras

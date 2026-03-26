@@ -278,6 +278,12 @@ Errors:
 - 404: `{ "error": "Asignación no encontrada" }`
 - 422: error de validación (uuid inválido)
 
+### GET /asignaciones/coordinador-tecnico/lista?tecnico_id=\<uuid\>
+Lista asignaciones coordinador->técnico. `tecnico_id` es opcional para filtrar.
+
+Success:
+- 200: `TecnicoDetalle[]`
+
 ### POST /asignaciones/coordinador-tecnico
 Asigna o reasigna coordinador a un técnico. Valida que coordinador y técnico existan y estén activos.
 
@@ -296,11 +302,47 @@ Errors:
 - 400: `{ "error": "Coordinador inválido o inactivo" }`
 - 400: `{ "error": "Técnico inválido o inactivo" }`
 
+### PATCH /asignaciones/coordinador-tecnico/:tecnico_id
+Edita una asignación coordinador->técnico.
+
+Request body (todos opcionales):
+```json
+{
+  "coordinador_id": "uuid",
+  "fecha_limite": "ISO datetime",
+  "activo": true
+}
+```
+
+Success:
+- 200: `TecnicoDetalle`
+
+Errors:
+- 400: `{ "error": "Coordinador inválido o inactivo" }`
+- 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación
+
 ### DELETE /asignaciones/coordinador-tecnico/:tecnico_id
 Marca `activo=false` y `estado_corte=baja` en `tecnico_detalles`.
 
 Success:
 - 200: `{ "message": "Asignación removida" }`
+
+Errors:
+- 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación (uuid inválido)
+
+### GET /asignaciones/beneficiario?tecnico_id=\<uuid\>&beneficiario_id=\<uuid\>&activo=true|false
+Lista asignaciones técnico->beneficiario con filtros opcionales.
+
+Success:
+- 200: `AsignacionBeneficiario[]`
+
+### GET /asignaciones/beneficiario/:id
+Obtiene una asignación técnico->beneficiario por id.
+
+Success:
+- 200: `AsignacionBeneficiario`
 
 Errors:
 - 404: `{ "error": "Asignación no encontrada" }`
@@ -323,6 +365,27 @@ Errors:
 - 400: `{ "error": "Técnico inválido o inactivo" }`
 - 404: `{ "error": "Beneficiario no encontrado" }`
 
+### PATCH /asignaciones/beneficiario/:id
+Edita una asignación técnico->beneficiario.
+
+Request body (todos opcionales):
+```json
+{
+  "tecnico_id": "uuid",
+  "beneficiario_id": "uuid",
+  "activo": true
+}
+```
+
+Success:
+- 200: `AsignacionBeneficiario`
+
+Errors:
+- 400: `{ "error": "Técnico inválido o inactivo" }`
+- 404: `{ "error": "Asignación no encontrada" }`
+- 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación
+
 ### DELETE /asignaciones/beneficiario/:id
 Soft-remove: marca `activo=false` y `removido_en=NOW()` por id de asignación.
 
@@ -331,6 +394,22 @@ Success:
 
 Errors:
 - 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación (uuid inválido)
+
+### GET /asignaciones/actividad?tecnico_id=\<uuid\>&actividad_id=\<uuid\>&activo=true|false
+Lista asignaciones técnico->actividad con filtros opcionales.
+
+Success:
+- 200: `AsignacionActividad[]`
+
+### GET /asignaciones/actividad/:id
+Obtiene una asignación técnico->actividad por id.
+
+Success:
+- 200: `AsignacionActividad`
+
+Errors:
+- 404: `{ "error": "Asignación de actividad no encontrada" }`
 - 422: error de validación (uuid inválido)
 
 ### POST /asignaciones/actividad
@@ -349,6 +428,27 @@ Success:
 Errors:
 - 400: `{ "error": "Técnico inválido o inactivo" }`
 - 404: `{ "error": "Actividad no encontrada" }`
+
+### PATCH /asignaciones/actividad/:id
+Edita una asignación técnico->actividad.
+
+Request body (todos opcionales):
+```json
+{
+  "tecnico_id": "uuid",
+  "actividad_id": "uuid",
+  "activo": true
+}
+```
+
+Success:
+- 200: `AsignacionActividad`
+
+Errors:
+- 400: `{ "error": "Técnico inválido o inactivo" }`
+- 404: `{ "error": "Asignación de actividad no encontrada" }`
+- 404: `{ "error": "Actividad no encontrada" }`
+- 422: error de validación
 
 ### DELETE /asignaciones/actividad/:id
 Soft-remove: marca `activo=false` y `removido_en=NOW()` por id de asignación.
@@ -452,6 +552,7 @@ Success:
 
 Errors:
 - 400: `{ "error": "coord_parcela debe tener formato 'x,y'" }`
+- 400: `{ "error": "Localidad no encontrada o inactiva" }`
 - 400: `{ "error": "Técnico no encontrado o inactivo" }`
 - 403: `{ "error": "Sin permisos para asignar este técnico" }`
 - 422: error de validación (campo requerido faltante)
@@ -480,8 +581,18 @@ Success:
 
 Errors:
 - 400: `{ "error": "coord_parcela debe tener formato 'x,y'" }`
+- 400: `{ "error": "Localidad no encontrada o inactiva" }`
 - 400: `{ "error": "Técnico no encontrado o inactivo" }`
 - 403: `{ "error": "Sin permisos para asignar este técnico" }`
+- 404: `{ "error": "Beneficiario no encontrado" }`
+
+### DELETE /beneficiarios/:id
+Soft-delete del beneficiario (`activo=false`) y desactivación de asignaciones activas en `asignaciones_beneficiario`.
+
+Success:
+- 200: `{ "message": "Beneficiario desactivado" }`
+
+Errors:
 - 404: `{ "error": "Beneficiario no encontrado" }`
 
 ### POST /beneficiarios/:id/cadenas

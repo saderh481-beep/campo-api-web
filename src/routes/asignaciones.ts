@@ -7,7 +7,16 @@ import {
   deleteAsignacionActividad,
   deleteAsignacionBeneficiario,
   deleteAsignacionCoordinadorTecnico,
+  getAsignacionActividadById,
+  getAsignacionBeneficiarioById,
   getAsignacionCoordinadorTecnico,
+  getAsignacionCoordinadorTecnicoByTecnicoId,
+  getAsignacionesActividad,
+  getAsignacionesBeneficiario,
+  getAsignacionesCoordinadorTecnico,
+  patchAsignacionActividad,
+  patchAsignacionBeneficiario,
+  patchAsignacionCoordinadorTecnico,
   postAsignacionActividad,
   postAsignacionBeneficiario,
   postAsignacionCoordinadorTecnico,
@@ -20,6 +29,18 @@ app.get(
   "/coordinador-tecnico",
   zValidator("query", z.object({ tecnico_id: z.string().uuid() })),
   getAsignacionCoordinadorTecnico
+);
+
+app.get(
+  "/coordinador-tecnico/lista",
+  zValidator("query", z.object({ tecnico_id: z.string().uuid().optional() })),
+  getAsignacionesCoordinadorTecnico
+);
+
+app.get(
+  "/coordinador-tecnico/:tecnico_id",
+  zValidator("param", z.object({ tecnico_id: z.string().uuid() })),
+  getAsignacionCoordinadorTecnicoByTecnicoId
 );
 
 app.post(
@@ -41,6 +62,39 @@ app.delete(
   deleteAsignacionCoordinadorTecnico
 );
 
+app.patch(
+  "/coordinador-tecnico/:tecnico_id",
+  zValidator("param", z.object({ tecnico_id: z.string().uuid() })),
+  zValidator(
+    "json",
+    z.object({
+      coordinador_id: z.string().uuid().optional(),
+      fecha_limite: z.string().datetime().optional(),
+      activo: z.boolean().optional(),
+    })
+  ),
+  (c) => patchAsignacionCoordinadorTecnico(c, c.req.valid("json"))
+);
+
+app.get(
+  "/beneficiario",
+  zValidator(
+    "query",
+    z.object({
+      tecnico_id: z.string().uuid().optional(),
+      beneficiario_id: z.string().uuid().optional(),
+      activo: z.enum(["true", "false"]).optional(),
+    })
+  ),
+  getAsignacionesBeneficiario
+);
+
+app.get(
+  "/beneficiario/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  getAsignacionBeneficiarioById
+);
+
 app.post(
   "/beneficiario",
   zValidator(
@@ -56,6 +110,39 @@ app.delete(
   deleteAsignacionBeneficiario
 );
 
+app.patch(
+  "/beneficiario/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  zValidator(
+    "json",
+    z.object({
+      tecnico_id: z.string().uuid().optional(),
+      beneficiario_id: z.string().uuid().optional(),
+      activo: z.boolean().optional(),
+    })
+  ),
+  (c) => patchAsignacionBeneficiario(c, c.req.valid("json"))
+);
+
+app.get(
+  "/actividad",
+  zValidator(
+    "query",
+    z.object({
+      tecnico_id: z.string().uuid().optional(),
+      actividad_id: z.string().uuid().optional(),
+      activo: z.enum(["true", "false"]).optional(),
+    })
+  ),
+  getAsignacionesActividad
+);
+
+app.get(
+  "/actividad/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  getAsignacionActividadById
+);
+
 app.post(
   "/actividad",
   zValidator(
@@ -69,6 +156,20 @@ app.delete(
   "/actividad/:id",
   zValidator("param", z.object({ id: z.string().uuid() })),
   deleteAsignacionActividad
+);
+
+app.patch(
+  "/actividad/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  zValidator(
+    "json",
+    z.object({
+      tecnico_id: z.string().uuid().optional(),
+      actividad_id: z.string().uuid().optional(),
+      activo: z.boolean().optional(),
+    })
+  ),
+  (c) => patchAsignacionActividad(c, c.req.valid("json"))
 );
 
 export default app;

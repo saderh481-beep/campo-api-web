@@ -27,6 +27,15 @@ function normalizePoint(value?: string): string | null {
   return `(${match[1]},${match[2]})`;
 }
 
+async function existsLocalidadActiva(localidadId: string): Promise<boolean> {
+  const [row] = await sql`
+    SELECT id
+    FROM localidades
+    WHERE id = ${localidadId} AND activo = true
+  `;
+  return Boolean(row);
+}
+
 app.get("/", async (c) => {
   const user = c.get("user");
   const beneficiarios =
@@ -52,9 +61,12 @@ app.get("/", async (c) => {
   return c.json(beneficiarios);
 });
 
-app.get("/:id", async (c) => {
+app.get(
+  "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
   const user = c.get("user");
-  const { id } = c.req.param();
+  const { id } = c.req.valid("param");
   const [beneficiario] =
     user.rol === "administrador"
       ? await sql`SELECT * FROM beneficiarios WHERE id = ${id} AND activo = true`
@@ -70,14 +82,15 @@ app.get("/:id", async (c) => {
     SELECT cp.id, cp.nombre
     FROM beneficiario_cadenas bc
     JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
-    WHERE bc.beneficiario_id = ${id} AND bc.activo = true
+    WHERE bc.beneficiario_id = ${id} AND bc.activo = true AND cp.activo = true
   `;
   const documentos = await sql`
     SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
     FROM documentos WHERE beneficiario_id = ${id}
   `;
   return c.json({ ...beneficiario, cadenas, documentos });
-});
+}
+);
 
 app.post(
   "/",
@@ -103,6 +116,10 @@ app.post(
 
     if (body.coord_parcela && !coordParcela) {
       return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+    }
+
+    if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
+      return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
     }
 
     const [tecnico] = await sql`
@@ -149,6 +166,7 @@ app.post(
 
 app.patch(
   "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({
@@ -166,7 +184,7 @@ app.patch(
   ),
   async (c) => {
     const user = c.get("user");
-    const { id } = c.req.param();
+    const { id } = c.req.valid("param");
     const body = c.req.valid("json");
     const coordParcela = normalizePoint(body.coord_parcela);
 
@@ -183,6 +201,10 @@ app.patch(
 
     if (body.coord_parcela && !coordParcela) {
       return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+    }
+
+    if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
+      return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
     }
 
     if (body.tecnico_id) {
@@ -244,13 +266,59 @@ app.patch(
   }
 );
 
+app.delete(
+  "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.valid("param");
+
+  const [beneficiario] =
+    user.rol === "administrador"
+      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
+      : await sql`
+          SELECT b.id
+          FROM beneficiarios b
+          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
+          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
+        `;
+
+  if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+  const reserved = await sql.reserve();
+  try {
+    await reserved`BEGIN`;
+    await reserved`
+      UPDATE beneficiarios
+      SET activo = false, updated_at = NOW()
+      WHERE id = ${id} AND activo = true
+    `;
+
+    await reserved`
+      UPDATE asignaciones_beneficiario
+      SET activo = false, removido_en = NOW()
+      WHERE beneficiario_id = ${id} AND activo = true
+    `;
+    await reserved`COMMIT`;
+  } catch (err) {
+    await reserved`ROLLBACK`;
+    throw err;
+  } finally {
+    reserved.release();
+  }
+
+  return c.json({ message: "Beneficiario desactivado" });
+}
+);
+
 app.post(
   "/:id/cadenas",
   requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ cadena_ids: z.array(z.string().uuid()) })),
   async (c) => {
     const user = c.get("user");
-    const { id } = c.req.param();
+    const { id } = c.req.valid("param");
     const { cadena_ids } = c.req.valid("json");
 
     const [beneficiario] =
@@ -288,8 +356,11 @@ app.post(
   }
 );
 
-app.post("/:id/documentos", async (c) => {
-  const { id } = c.req.param();
+app.post(
+  "/:id/documentos",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+  const { id } = c.req.valid("param");
   const user = c.get("user");
 
   const [beneficiario] =
@@ -320,10 +391,14 @@ app.post("/:id/documentos", async (c) => {
     RETURNING id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
   `;
   return c.json(doc, 201);
-});
+}
+);
 
-app.get("/:id/documentos", async (c) => {
-  const { id } = c.req.param();
+app.get(
+  "/:id/documentos",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+  const { id } = c.req.valid("param");
   const user = c.get("user");
 
   const [beneficiario] =
@@ -342,6 +417,7 @@ app.get("/:id/documentos", async (c) => {
     FROM documentos WHERE beneficiario_id = ${id}
   `;
   return c.json(docs);
-});
+}
+);
 
 export default app;
