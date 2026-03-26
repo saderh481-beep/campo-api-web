@@ -28,6 +28,7 @@ app.post(
 
 app.patch(
   "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({
@@ -42,6 +43,10 @@ app.patch(
   (c) => patchUsuario(c, c.req.valid("json"))
 );
 
-app.delete("/:id", deleteUsuario);
+app.delete(
+  "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteUsuario
+);
 
 export default app;

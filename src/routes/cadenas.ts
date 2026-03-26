@@ -20,6 +20,7 @@ app.post(
 app.patch(
   "/:id",
   requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional() })
@@ -27,6 +28,11 @@ app.patch(
   (c) => patchCadena(c, c.req.valid("json"))
 );
 
-app.delete("/:id", requireRole("administrador"), deleteCadena);
+app.delete(
+  "/:id",
+  requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteCadena
+);
 
 export default app;

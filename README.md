@@ -73,6 +73,10 @@ bun run typecheck
 
 ## Novedades recientes
 
+- Asignaciones: se documenta y expone el CRUD completo por relacion en un solo modulo: coordinador -> tecnico, tecnico -> beneficiario y tecnico -> actividad, incluyendo `GET /asignaciones/coordinador-tecnico/:tecnico_id`.
+- Tecnicos: `POST /tecnicos` se mantiene como ruta no soportada y responde `405`, dejando explicito que el alta real ocurre en `POST /usuarios` con `rol=tecnico`.
+- Bitacoras y notificaciones: las rutas con `:id` ahora validan UUID en params y responden `422` cuando el identificador es invalido.
+- API docs: `API_ENDPOINTS.md` se sincronizo con rutas nuevas, errores `422` de validacion y codigos HTTP corregidos.
 - Beneficiarios: se agrego soporte completo de `localidad_id` en `GET /beneficiarios`, `POST /beneficiarios` y `PATCH /beneficiarios/:id`.
 - Beneficiarios: el alcance para coordinador en listado, detalle y documentos ahora se determina por `beneficiarios.tecnico_id` + `tecnico_detalles.coordinador_id`.
 - Beneficiarios: al crear o reasignar un beneficiario se sincroniza tambien `asignaciones_beneficiario` para mantener consistencia con modulos de tecnicos/asignaciones.

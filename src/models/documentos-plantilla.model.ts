@@ -61,7 +61,7 @@ export async function updateDocumentoPlantilla(id: string, input: DocumentoPlant
     WHERE id = ${id}
     RETURNING id, nombre, descripcion, obligatorio, orden, configuracion, activo, created_at, updated_at
   `;
-  return documento;
+  return documento ?? null;
 }
 
 export async function deactivateDocumentoPlantilla(id: string) {
@@ -70,5 +70,5 @@ export async function deactivateDocumentoPlantilla(id: string) {
     WHERE id = ${id} AND activo = true
     RETURNING id
   `;
-  return documento;
+  return documento ?? null;
 }

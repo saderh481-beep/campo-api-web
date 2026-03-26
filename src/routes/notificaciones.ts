@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import {
   getNotificaciones,
   patchNotificacionLeida,
@@ -12,7 +14,11 @@ app.use("*", authMiddleware, requireRole("administrador", "tecnico"));
 
 app.get("/", getNotificaciones);
 
-app.patch("/:id/leer", patchNotificacionLeida);
+app.patch(
+  "/:id/leer",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  patchNotificacionLeida
+);
 
 app.patch("/leer-todas", patchNotificacionesLeerTodas);
 

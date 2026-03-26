@@ -11,6 +11,7 @@ export async function listDocumentosPdf() {
   return sql`
     SELECT id, clave, nombre, descripcion, mime_type, bytes, r2_key, sha256, activo, created_by, created_at, updated_at
     FROM documentos_pdf
+    WHERE activo = true
     ORDER BY created_at DESC
   `;
 }

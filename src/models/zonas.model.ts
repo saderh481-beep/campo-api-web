@@ -37,7 +37,7 @@ export async function updateZona(id: string, input: ZonaUpdateInput) {
     WHERE id = ${id} AND activo = true
     RETURNING id, nombre, descripcion, activo, created_at, updated_at
   `;
-  return zona;
+  return zona ?? null;
 }
 
 export async function deactivateZona(id: string) {
@@ -46,5 +46,5 @@ export async function deactivateZona(id: string) {
     WHERE id = ${id} AND activo = true
     RETURNING id
   `;
-  return zona;
+  return zona ?? null;
 }

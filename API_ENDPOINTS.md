@@ -7,6 +7,10 @@ Error shape (general):
 - { "error": string }
 - Some endpoints also return { "message": string }
 
+Validation note:
+- Las rutas con validación Zod responden `422` cuando el body, query o params no cumplen el formato esperado.
+- En particular, la mayoría de rutas con `:id`, `:tecnico_id` o ids relacionados esperan UUID válido.
+
 ## Auth
 
 ### POST /auth/request-codigo-acceso
@@ -170,12 +174,14 @@ Success:
 Errors:
 - 403: { "error": "Sin permisos" }
 - 404: { "error": "Técnico no encontrado" }
+- 422: error de validación (uuid inválido)
 
 ### POST /tecnicos
 Role: administrador
 Not available.
 Errors:
-- 409: { "error": "La creación de técnicos se realiza desde /usuarios con rol 'tecnico'." }
+- 405: { "error": "La creación de técnicos se realiza desde /usuarios con rol 'tecnico'." }
+- 422: error de validación del body
 
 ### PATCH /tecnicos/:id
 Role: administrador
@@ -195,6 +201,7 @@ Errors:
 - 400: { "error": string }
 - 404: { "error": "Técnico no encontrado" }
 - 409: { "error": "El correo ya está registrado" }
+- 422: error de validación
 
 ### POST /tecnicos/:id/codigo
 Role: administrador
@@ -202,6 +209,7 @@ Success:
 - 200: { "message": "Código generado y enviado", "codigo": "12345" }
 Errors:
 - 404: { "error": "Técnico no encontrado" }
+- 422: error de validación (uuid inválido)
 
 ### POST /tecnicos/aplicar-cortes
 Role: administrador
@@ -215,6 +223,7 @@ Success:
 Errors:
 - 403: { "error": "Sin permisos sobre este técnico" }
 - 404: { "error": "Técnico no encontrado" }
+- 422: error de validación (uuid inválido)
 
 ### DELETE /tecnicos/:id
 Role: administrador
@@ -222,6 +231,7 @@ Success:
 - 200: { "message": "Técnico desactivado" }
 Errors:
 - 404: { "error": "Técnico no encontrado" }
+- 422: error de validación (uuid inválido)
 
 ## Asignaciones
 Role required: administrador
@@ -274,15 +284,27 @@ Success:
 - 200: `TecnicoDetalle`
 
 Errors:
-- 400: `{ "error": "tecnico_id es requerido" }`
 - 404: `{ "error": "Asignación no encontrada" }`
-- 422: error de validación (uuid inválido)
+- 422: error de validación (uuid faltante o inválido)
 
 ### GET /asignaciones/coordinador-tecnico/lista?tecnico_id=\<uuid\>
 Lista asignaciones coordinador->técnico. `tecnico_id` es opcional para filtrar.
 
 Success:
 - 200: `TecnicoDetalle[]`
+
+Errors:
+- 422: error de validación (uuid inválido en filtro)
+
+### GET /asignaciones/coordinador-tecnico/:tecnico_id
+Obtiene una asignación coordinador->técnico por `tecnico_id` en path.
+
+Success:
+- 200: `TecnicoDetalle`
+
+Errors:
+- 404: `{ "error": "Asignación no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ### POST /asignaciones/coordinador-tecnico
 Asigna o reasigna coordinador a un técnico. Valida que coordinador y técnico existan y estén activos.
@@ -301,6 +323,7 @@ Success:
 Errors:
 - 400: `{ "error": "Coordinador inválido o inactivo" }`
 - 400: `{ "error": "Técnico inválido o inactivo" }`
+- 422: error de validación del body
 
 ### PATCH /asignaciones/coordinador-tecnico/:tecnico_id
 Edita una asignación coordinador->técnico.
@@ -338,6 +361,9 @@ Lista asignaciones técnico->beneficiario con filtros opcionales.
 Success:
 - 200: `AsignacionBeneficiario[]`
 
+Errors:
+- 422: error de validación en query
+
 ### GET /asignaciones/beneficiario/:id
 Obtiene una asignación técnico->beneficiario por id.
 
@@ -364,6 +390,7 @@ Success:
 Errors:
 - 400: `{ "error": "Técnico inválido o inactivo" }`
 - 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación del body
 
 ### PATCH /asignaciones/beneficiario/:id
 Edita una asignación técnico->beneficiario.
@@ -402,6 +429,9 @@ Lista asignaciones técnico->actividad con filtros opcionales.
 Success:
 - 200: `AsignacionActividad[]`
 
+Errors:
+- 422: error de validación en query
+
 ### GET /asignaciones/actividad/:id
 Obtiene una asignación técnico->actividad por id.
 
@@ -428,6 +458,7 @@ Success:
 Errors:
 - 400: `{ "error": "Técnico inválido o inactivo" }`
 - 404: `{ "error": "Actividad no encontrada" }`
+- 422: error de validación del body
 
 ### PATCH /asignaciones/actividad/:id
 Edita una asignación técnico->actividad.
@@ -527,6 +558,7 @@ Success:
 
 Errors:
 - 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación (uuid inválido)
 
 ### POST /beneficiarios
 Crea un beneficiario y automáticamente crea la asignación activa en `asignaciones_beneficiario` dentro de la misma transacción.
@@ -585,6 +617,7 @@ Errors:
 - 400: `{ "error": "Técnico no encontrado o inactivo" }`
 - 403: `{ "error": "Sin permisos para asignar este técnico" }`
 - 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación
 
 ### DELETE /beneficiarios/:id
 Soft-delete del beneficiario (`activo=false`) y desactivación de asignaciones activas en `asignaciones_beneficiario`.
@@ -594,6 +627,7 @@ Success:
 
 Errors:
 - 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación (uuid inválido)
 
 ### POST /beneficiarios/:id/cadenas
 Role: administrador
@@ -642,6 +676,7 @@ Status: 201
 Errors:
 - 400: `{ "error": "Archivo y tipo son requeridos" }`
 - 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación (uuid inválido)
 
 ### GET /beneficiarios/:id/documentos
 Lista documentos del beneficiario.
@@ -654,6 +689,7 @@ Success:
 
 Errors:
 - 404: `{ "error": "Beneficiario no encontrado" }`
+- 422: error de validación (uuid inválido)
 
 ## Bitacoras
 Roles: administrador, coordinador
@@ -663,11 +699,15 @@ Query params (all optional): tecnico_id, mes, anio, estado, tipo
 Success:
 - 200: BitacoraResumen[]
 
+Errors:
+- 422: error de validación en query (`tecnico_id` uuid, `mes` 1-12, `anio` 1900-3000, longitud de `estado`/`tipo`)
+
 ### GET /bitacoras/:id
 Success:
 - 200: Bitacora
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ### PATCH /bitacoras/:id
 Request body:
@@ -678,6 +718,7 @@ Success:
 - 200: Bitacora
 Errors:
 - 404
+- 422: error de validación (uuid inválido o longitudes excedidas)
 
 ### PATCH /bitacoras/:id/pdf-config
 Request body:
@@ -688,30 +729,35 @@ Success:
 - 200: { id, pdf_edicion, updated_at }
 Errors:
 - 404
+- 422: error de validación (uuid inválido o body inválido)
 
 ### GET /bitacoras/:id/pdf
 Success:
 - 200: application/pdf (inline)
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ### GET /bitacoras/:id/pdf/descargar
 Success:
 - 200: application/pdf (attachment)
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ### POST /bitacoras/:id/pdf/imprimir
 Success:
 - 200: application/pdf
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ### GET /bitacoras/:id/versiones
 Success:
 - 200: PdfVersion[]
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ## Reportes
 Roles: administrador, coordinador
@@ -721,12 +767,16 @@ Query params optional: mes, anio
 Success:
 - 200: { mes, anio, tecnicos }
 
+Errors:
+- 422: error de validación (`mes` 1-12, `anio` >= 1900)
+
 ### GET /reportes/tecnico/:id
 Query params optional: desde, hasta
 Success:
 - 200: { tecnico_id, total, bitacoras }
 Errors:
 - 404: { "error": "Técnico no encontrado o sin permisos" }
+- 422: error de validación (uuid inválido o fechas con formato incorrecto)
 
 ## Notificaciones
 Roles: administrador, tecnico
@@ -740,6 +790,7 @@ Success:
 - 200: `{ "message": "Marcada como leída", "notificacion": { "id": "uuid", "destino_id": "uuid", "tipo": "string", "titulo": "string", "leido": true, "created_at": "ISO datetime" } }`
 Errors:
 - 404: `{ "error": "Notificación no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ### PATCH /notificaciones/leer-todas
 Success:
@@ -770,6 +821,7 @@ Success:
 - 200: Localidad
 Errors:
 - 400, 404
+- 422: error de validación
 
 ### DELETE /localidades/:id
 Role: administrador
@@ -778,6 +830,7 @@ Success:
 Errors:
 - 404: `{ "error": "Localidad no encontrada" }`
 - 409: `{ "error": "No se puede desactivar una localidad con beneficiarios activos" }`
+- 422: error de validación (uuid inválido)
 
 ## Cadenas Productivas
 Role required: administrador
@@ -803,12 +856,14 @@ Success:
 - 200: Cadena
 Errors:
 - 404: `{ "error": "Cadena no encontrada" }`
+- 422: error de validación
 
 ### DELETE /cadenas-productivas/:id
 Success:
 - 200: `{ "message": "Cadena desactivada" }`
 Errors:
 - 404: `{ "error": "Cadena no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ## Actividades
 
@@ -836,6 +891,7 @@ Success:
 - 200: Actividad
 Errors:
 - 404: `{ "error": "Actividad no encontrada" }`
+- 422: error de validación
 
 ### DELETE /actividades/:id
 Role: administrador
@@ -843,6 +899,7 @@ Success:
 - 200: `{ "message": "Actividad desactivada" }`
 Errors:
 - 404: `{ "error": "Actividad no encontrada" }`
+- 422: error de validación (uuid inválido)
 
 ## Zonas
 Role required: administrador
@@ -868,12 +925,14 @@ Success:
 - 200: Zona
 Errors:
 - 404
+- 422: error de validación
 
 ### DELETE /zonas/:id
 Success:
 - 200: { "message": "Zona desactivada" }
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ## Configuraciones
 
@@ -934,6 +993,7 @@ Success:
 - 200: DocumentoPlantilla
 Errors:
 - 404
+- 422: error de validación
 
 ### DELETE /documentos-plantilla/:id
 Role: administrador
@@ -941,6 +1001,7 @@ Success:
 - 200: { "message": "Documento desactivado" }
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ## Documentos PDF
 Role required: administrador
@@ -966,12 +1027,14 @@ Success:
 - 200: DocumentoPdf
 Errors:
 - 404
+- 422: error de validación
 
 ### DELETE /documentos-pdf/:id
 Success:
 - 200: { "message": "Documento PDF desactivado" }
 Errors:
 - 404
+- 422: error de validación (uuid inválido)
 
 ## Archive
 Role required: administrador

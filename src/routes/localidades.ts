@@ -31,6 +31,7 @@ app.post(
 app.patch(
   "/:id",
   requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({
@@ -46,6 +47,11 @@ app.patch(
   (c) => patchLocalidad(c, c.req.valid("json"))
 );
 
-app.delete("/:id", requireRole("administrador"), deleteLocalidad);
+app.delete(
+  "/:id",
+  requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteLocalidad
+);
 
 export default app;

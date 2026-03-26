@@ -19,7 +19,12 @@ app.use("*", authMiddleware);
 
 app.get("/", requireRole("administrador", "coordinador"), getTecnicos);
 
-app.get("/:id", requireRole("administrador", "coordinador"), getTecnicoById);
+app.get(
+  "/:id",
+  requireRole("administrador", "coordinador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  getTecnicoById
+);
 
 app.post(
   "/",
@@ -41,7 +46,7 @@ app.post(
         error:
           "La creación de técnicos se realiza desde /usuarios con rol 'tecnico'.",
       },
-      409
+      405
     );
   }
 );
@@ -49,6 +54,7 @@ app.post(
 app.patch(
   "/:id",
   requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({
@@ -65,7 +71,12 @@ app.patch(
   }
 );
 
-app.post("/:id/codigo", requireRole("administrador"), postTecnicoCodigo);
+app.post(
+  "/:id/codigo",
+  requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  postTecnicoCodigo
+);
 
 // POST /aplicar-cortes — batch: aplica estado_corte a todos los vencidos (solo admin)
 app.post("/aplicar-cortes", requireRole("administrador"), postAplicarCortes);
@@ -74,9 +85,15 @@ app.post("/aplicar-cortes", requireRole("administrador"), postAplicarCortes);
 app.post(
   "/:id/cerrar-corte",
   requireRole("administrador", "coordinador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
   postCerrarCorte
 );
 
-app.delete("/:id", requireRole("administrador"), deleteTecnico);
+app.delete(
+  "/:id",
+  requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteTecnico
+);
 
 export default app;

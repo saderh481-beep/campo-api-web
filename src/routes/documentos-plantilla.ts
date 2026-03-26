@@ -37,6 +37,7 @@ app.post(
 app.patch(
   "/:id",
   requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({
@@ -50,6 +51,11 @@ app.patch(
   (c) => patchDocumentoPlantilla(c, c.req.valid("json"))
 );
 
-app.delete("/:id", requireRole("administrador"), deleteDocumentoPlantilla);
+app.delete(
+  "/:id",
+  requireRole("administrador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteDocumentoPlantilla
+);
 
 export default app;

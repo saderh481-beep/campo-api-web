@@ -70,7 +70,10 @@ app.get(
   }
 );
 
-app.get("/:id", async (c) => {
+app.get(
+  "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
   const [bitacora] =
@@ -84,10 +87,12 @@ app.get("/:id", async (c) => {
         `;
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
   return c.json(bitacora);
-});
+}
+);
 
 app.patch(
   "/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
     z.object({
@@ -125,6 +130,7 @@ app.patch(
 
 app.patch(
   "/:id/pdf-config",
+  zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ pdf_edicion: z.record(z.string(), z.unknown()) })),
   async (c) => {
     const user = c.get("user");
@@ -174,7 +180,10 @@ async function cargarPdfConfig(): Promise<PdfConfig> {
   return (row?.valor ?? {}) as PdfConfig;
 }
 
-app.get("/:id/pdf", async (c) => {
+app.get(
+  "/:id/pdf",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
@@ -188,9 +197,13 @@ app.get("/:id/pdf", async (c) => {
       "Content-Disposition": `inline; filename="bitacora-${id}.pdf"`,
     },
   });
-});
+}
+);
 
-app.get("/:id/pdf/descargar", async (c) => {
+app.get(
+  "/:id/pdf/descargar",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
@@ -204,9 +217,13 @@ app.get("/:id/pdf/descargar", async (c) => {
       "Content-Disposition": `attachment; filename="bitacora-${id}.pdf"`,
     },
   });
-});
+}
+);
 
-app.post("/:id/pdf/imprimir", async (c) => {
+app.post(
+  "/:id/pdf/imprimir",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
@@ -238,9 +255,13 @@ app.post("/:id/pdf/imprimir", async (c) => {
   return new Response(Buffer.from(pdfBytes), {
     headers: { "Content-Type": "application/pdf" },
   });
-});
+}
+);
 
-app.get("/:id/versiones", async (c) => {
+app.get(
+  "/:id/versiones",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
   const { id } = c.req.param();
   const user = c.get("user");
   const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
@@ -253,6 +274,7 @@ app.get("/:id/versiones", async (c) => {
     ORDER BY version DESC
   `;
   return c.json(versiones);
-});
+}
+);
 
 export default app;

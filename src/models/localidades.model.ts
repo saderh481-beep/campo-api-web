@@ -48,7 +48,7 @@ export async function updateLocalidad(id: string, input: LocalidadUpdateInput) {
     WHERE id = ${id} AND activo = true
     RETURNING id, zona_id, municipio, nombre, cp, activo, created_at, updated_at
   `;
-  return localidad;
+  return localidad ?? null;
 }
 
 export async function deactivateLocalidad(id: string) {
@@ -57,7 +57,7 @@ export async function deactivateLocalidad(id: string) {
     WHERE id = ${id} AND activo = true
     RETURNING id
   `;
-  return localidad;
+  return localidad ?? null;
 }
 
 export async function hasBeneficiariosActivosByLocalidadId(localidadId: string) {
