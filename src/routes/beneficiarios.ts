@@ -36,6 +36,7 @@ app.get("/", async (c) => {
                  b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
                  b.coord_parcela, b.activo, b.created_at, b.updated_at
           FROM beneficiarios b
+           WHERE b.activo = true
           ORDER BY b.nombre
         `
       : await sql`
@@ -45,7 +46,7 @@ app.get("/", async (c) => {
           FROM beneficiarios b
           JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
           JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-          WHERE td.coordinador_id = ${user.sub}
+           WHERE td.coordinador_id = ${user.sub} AND b.activo = true
           ORDER BY b.nombre
         `;
   return c.json(beneficiarios);
@@ -56,12 +57,12 @@ app.get("/:id", async (c) => {
   const { id } = c.req.param();
   const [beneficiario] =
     user.rol === "administrador"
-      ? await sql`SELECT * FROM beneficiarios WHERE id = ${id}`
+      ? await sql`SELECT * FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.*
           FROM beneficiarios b
           JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
         `;
   if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
@@ -171,12 +172,12 @@ app.patch(
 
     const [beneficiarioActual] =
       user.rol === "administrador"
-        ? await sql`SELECT id, tecnico_id FROM beneficiarios WHERE id = ${id}`
+        ? await sql`SELECT id, tecnico_id FROM beneficiarios WHERE id = ${id} AND activo = true`
         : await sql`
             SELECT b.id, b.tecnico_id
             FROM beneficiarios b
             JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
           `;
     if (!beneficiarioActual) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
@@ -254,14 +255,25 @@ app.post(
 
     const [beneficiario] =
       user.rol === "administrador"
-        ? await sql`SELECT id FROM beneficiarios WHERE id = ${id}`
+        ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
         : await sql`
             SELECT b.id
             FROM beneficiarios b
             JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
           `;
     if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+    if (cadena_ids.length > 0) {
+      const validas = await sql`
+        SELECT id
+        FROM cadenas_productivas
+        WHERE id = ANY(${cadena_ids}::uuid[]) AND activo = true
+      `;
+      if (validas.length !== cadena_ids.length) {
+        return c.json({ error: "Una o más cadenas no existen o están inactivas" }, 400);
+      }
+    }
 
     await sql`UPDATE beneficiario_cadenas SET activo = false WHERE beneficiario_id = ${id}`;
     if (cadena_ids.length > 0) {
@@ -282,12 +294,12 @@ app.post("/:id/documentos", async (c) => {
 
   const [beneficiario] =
     user.rol === "administrador"
-      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id}`
+      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.id
           FROM beneficiarios b
           JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
         `;
   if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
@@ -316,12 +328,12 @@ app.get("/:id/documentos", async (c) => {
 
   const [beneficiario] =
     user.rol === "administrador"
-      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id}`
+      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.id
           FROM beneficiarios b
           JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
         `;
   if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 

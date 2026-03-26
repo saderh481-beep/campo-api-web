@@ -14,6 +14,7 @@ export async function listCadenas() {
   return sql`
     SELECT id, nombre, descripcion, activo, created_by, created_at, updated_at
     FROM cadenas_productivas
+    WHERE activo = true
     ORDER BY nombre
   `;
 }
@@ -33,7 +34,7 @@ export async function updateCadena(id: string, input: CadenaUpdateInput) {
       nombre = COALESCE(${input.nombre ?? null}, nombre),
       descripcion = COALESCE(${input.descripcion ?? null}, descripcion),
       updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND activo = true
     RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
   `;
   return row ?? null;
@@ -42,7 +43,7 @@ export async function updateCadena(id: string, input: CadenaUpdateInput) {
 export async function deactivateCadena(id: string) {
   const [row] = await sql`
     UPDATE cadenas_productivas SET activo = false, updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND activo = true
     RETURNING id
   `;
   return row ?? null;

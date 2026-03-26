@@ -16,46 +16,59 @@ const app = new Hono<{
 }>();
 app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
 
-app.get("/", async (c) => {
-  const user = c.get("user");
-  const { tecnico_id, mes, anio, estado, tipo } = c.req.query();
+app.get(
+  "/",
+  zValidator(
+    "query",
+    z.object({
+      tecnico_id: z.string().uuid().optional(),
+      mes: z.coerce.number().int().min(1).max(12).optional(),
+      anio: z.coerce.number().int().min(1900).max(3000).optional(),
+      estado: z.string().max(40).optional(),
+      tipo: z.string().max(80).optional(),
+    })
+  ),
+  async (c) => {
+    const user = c.get("user");
+    const { tecnico_id, mes, anio, estado, tipo } = c.req.valid("query");
 
-  const condiciones: string[] = [];
-  const params: Array<string | number> = [];
-  let i = 1;
+    const condiciones: string[] = [];
+    const params: Array<string | number> = [];
+    let i = 1;
 
-  if (user.rol === "coordinador") {
-    condiciones.push(`td.coordinador_id = $${i++}`);
-    params.push(user.sub);
+    if (user.rol === "coordinador") {
+      condiciones.push(`td.coordinador_id = $${i++}`);
+      params.push(user.sub);
+    }
+    if (tecnico_id) { condiciones.push(`b.tecnico_id = $${i++}`); params.push(tecnico_id); }
+    if (mes) { condiciones.push(`EXTRACT(MONTH FROM b.fecha_inicio) = $${i++}`); params.push(mes); }
+    if (anio) { condiciones.push(`EXTRACT(YEAR FROM b.fecha_inicio) = $${i++}`); params.push(anio); }
+    if (estado) { condiciones.push(`b.estado = $${i++}`); params.push(estado); }
+    if (tipo) { condiciones.push(`b.tipo = $${i++}`); params.push(tipo); }
+
+    const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+
+    const bitacoras = await sql.unsafe(
+      `SELECT b.id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin,
+              t.nombre AS tecnico_nombre,
+              be.nombre AS beneficiario_nombre,
+              cp.nombre AS cadena_nombre,
+              a.nombre AS actividad_nombre
+       FROM bitacoras b
+       JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+       LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+       LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
+       LEFT JOIN cadenas_productivas cp ON cp.id = b.cadena_productiva_id
+       LEFT JOIN actividades a ON a.id = b.actividad_id
+       LEFT JOIN usuarios u ON u.id = td.coordinador_id
+       ${where}
+       ORDER BY b.fecha_inicio DESC
+       LIMIT 100`,
+      params
+    );
+    return c.json(bitacoras);
   }
-  if (tecnico_id) { condiciones.push(`b.tecnico_id = $${i++}`); params.push(tecnico_id); }
-  if (mes) { condiciones.push(`EXTRACT(MONTH FROM b.fecha_inicio) = $${i++}`); params.push(Number(mes)); }
-  if (anio) { condiciones.push(`EXTRACT(YEAR FROM b.fecha_inicio) = $${i++}`); params.push(Number(anio)); }
-  if (estado) { condiciones.push(`b.estado = $${i++}`); params.push(estado); }
-  if (tipo) { condiciones.push(`b.tipo = $${i++}`); params.push(tipo); }
-
-  const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
-
-  const bitacoras = await sql.unsafe(
-    `SELECT b.id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin,
-            t.nombre AS tecnico_nombre,
-            be.nombre AS beneficiario_nombre,
-            cp.nombre AS cadena_nombre,
-            a.nombre AS actividad_nombre
-     FROM bitacoras b
-     JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-    LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-     LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
-     LEFT JOIN cadenas_productivas cp ON cp.id = b.cadena_productiva_id
-     LEFT JOIN actividades a ON a.id = b.actividad_id
-    LEFT JOIN usuarios u ON u.id = td.coordinador_id
-     ${where}
-     ORDER BY b.fecha_inicio DESC
-     LIMIT 100`,
-    params
-  );
-  return c.json(bitacoras);
-});
+);
 
 app.get("/:id", async (c) => {
   const user = c.get("user");
@@ -78,8 +91,8 @@ app.patch(
   zValidator(
     "json",
     z.object({
-      observaciones: z.string().optional(),
-      actividades_realizadas: z.string().optional(),
+      observaciones: z.string().max(5000).optional(),
+      actividades_realizadas: z.string().max(10000).optional(),
     })
   ),
   async (c) => {

@@ -16,7 +16,11 @@ import {
 const app = new Hono<AppEnv>();
 app.use("*", authMiddleware, requireRole("administrador"));
 
-app.get("/coordinador-tecnico", getAsignacionCoordinadorTecnico);
+app.get(
+  "/coordinador-tecnico",
+  zValidator("query", z.object({ tecnico_id: z.string().uuid() })),
+  getAsignacionCoordinadorTecnico
+);
 
 app.post(
   "/coordinador-tecnico",
@@ -31,7 +35,11 @@ app.post(
   (c) => postAsignacionCoordinadorTecnico(c, c.req.valid("json"))
 );
 
-app.delete("/coordinador-tecnico/:tecnico_id", deleteAsignacionCoordinadorTecnico);
+app.delete(
+  "/coordinador-tecnico/:tecnico_id",
+  zValidator("param", z.object({ tecnico_id: z.string().uuid() })),
+  deleteAsignacionCoordinadorTecnico
+);
 
 app.post(
   "/beneficiario",
@@ -42,7 +50,11 @@ app.post(
   (c) => postAsignacionBeneficiario(c, c.req.valid("json"))
 );
 
-app.delete("/beneficiario/:id", deleteAsignacionBeneficiario);
+app.delete(
+  "/beneficiario/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteAsignacionBeneficiario
+);
 
 app.post(
   "/actividad",
@@ -53,6 +65,10 @@ app.post(
   (c) => postAsignacionActividad(c, c.req.valid("json"))
 );
 
-app.delete("/actividad/:id", deleteAsignacionActividad);
+app.delete(
+  "/actividad/:id",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteAsignacionActividad
+);
 
 export default app;

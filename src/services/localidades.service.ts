@@ -2,6 +2,7 @@ import {
   createLocalidad,
   deactivateLocalidad,
   existsZonaActiva,
+  hasBeneficiariosActivosByLocalidadId,
   listLocalidades,
   updateLocalidad,
   type LocalidadInput,
@@ -32,6 +33,10 @@ export async function editarLocalidad(id: string, input: LocalidadUpdateInput) {
 }
 
 export async function eliminarLocalidad(id: string) {
+  if (await hasBeneficiariosActivosByLocalidadId(id)) {
+    return { status: 409 as const, body: { error: "No se puede desactivar una localidad con beneficiarios activos" } };
+  }
+
   const row = await deactivateLocalidad(id);
   if (!row) return { status: 404 as const, body: { error: "Localidad no encontrada" } };
   return { status: 200 as const, body: { message: "Localidad desactivada" } };

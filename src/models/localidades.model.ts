@@ -59,3 +59,13 @@ export async function deactivateLocalidad(id: string) {
   `;
   return localidad;
 }
+
+export async function hasBeneficiariosActivosByLocalidadId(localidadId: string) {
+  const [row] = await sql`
+    SELECT id
+    FROM beneficiarios
+    WHERE localidad_id = ${localidadId} AND activo = true
+    LIMIT 1
+  `;
+  return Boolean(row);
+}

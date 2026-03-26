@@ -52,7 +52,7 @@ export async function iniciarSesion(input: LoginInput, client: ClientMetadata) {
 
     const vencido =
       tecnico.estado_corte === "corte_aplicado" ||
-      (fechaCorteGlobal && new Date(fechaCorteGlobal) < new Date());
+      (fechaCorteGlobal && new Date(fechaCorteGlobal) <= new Date());
 
     if (vencido) {
       if (tecnico.estado_corte !== "corte_aplicado") {

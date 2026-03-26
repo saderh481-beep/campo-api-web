@@ -14,6 +14,7 @@ export async function listActividades() {
   return sql`
     SELECT id, nombre, descripcion, activo, created_by, created_at, updated_at
     FROM actividades
+    WHERE activo = true
     ORDER BY nombre
   `;
 }
@@ -33,7 +34,7 @@ export async function updateActividad(id: string, input: ActividadUpdateInput) {
       nombre = COALESCE(${input.nombre ?? null}, nombre),
       descripcion = COALESCE(${input.descripcion ?? null}, descripcion),
       updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND activo = true
     RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
   `;
   return row ?? null;
@@ -42,7 +43,7 @@ export async function updateActividad(id: string, input: ActividadUpdateInput) {
 export async function deactivateActividad(id: string) {
   const [row] = await sql`
     UPDATE actividades SET activo = false, updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND activo = true
     RETURNING id
   `;
   return row ?? null;

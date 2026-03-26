@@ -10,14 +10,23 @@ app.use("*", authMiddleware, requireRole("administrador"));
 
 app.get("/", getArchiveLogs);
 
-app.get("/:periodo/descargar", getArchiveDownload);
+app.get(
+  "/:periodo/descargar",
+  zValidator("param", z.object({ periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })),
+  getArchiveDownload
+);
 
 app.post(
   "/:periodo/confirmar",
+  zValidator("param", z.object({ periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })),
   zValidator("json", z.object({ confirmar: z.literal(true) })),
   postArchiveConfirm
 );
 
-app.post("/:periodo/forzar", postArchiveForce);
+app.post(
+  "/:periodo/forzar",
+  zValidator("param", z.object({ periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })),
+  postArchiveForce
+);
 
 export default app;

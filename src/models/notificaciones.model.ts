@@ -11,10 +11,13 @@ export async function listNotificacionesNoLeidas(destinoId: string) {
 }
 
 export async function markNotificacionLeida(id: string, destinoId: string) {
-  await sql`
-    UPDATE notificaciones SET leido = true
+  const [row] = await sql`
+    UPDATE notificaciones
+    SET leido = true
     WHERE id = ${id} AND destino_id = ${destinoId}
+    RETURNING id, destino_id, tipo, titulo, leido, created_at
   `;
+  return row ?? null;
 }
 
 export async function markAllNotificacionesLeidas(destinoId: string) {

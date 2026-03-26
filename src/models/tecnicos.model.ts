@@ -41,7 +41,7 @@ export async function findTecnicoById(id: string) {
            td.estado_corte, t.codigo_acceso, t.activo, t.created_at, t.updated_at,
            u.nombre AS coordinador_nombre
     FROM usuarios t
-    LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id
+    LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
     LEFT JOIN usuarios u ON u.id = td.coordinador_id
     WHERE t.id = ${id} AND t.rol = 'tecnico' AND t.activo = true
   `;
@@ -130,7 +130,7 @@ export async function applyCortesVencidos() {
     WHERE td.tecnico_id = t.id
       AND t.rol = 'tecnico'
       AND ${fechaCorte}::timestamptz < NOW()
-      AND td.estado_corte = 'en_servicio'
+      AND COALESCE(td.estado_corte, 'en_servicio') = 'en_servicio'
       AND td.activo = true
       AND t.activo = true
     RETURNING t.id, t.nombre, t.correo, ${fechaCorte}::timestamptz AS fecha_corte
@@ -142,7 +142,7 @@ export async function cerrarCorteById(id: string) {
     UPDATE tecnico_detalles
     SET estado_corte = 'corte_aplicado',
         updated_at   = NOW()
-    WHERE tecnico_id = ${id}
+    WHERE tecnico_id = ${id} AND activo = true
     RETURNING tecnico_id AS id, estado_corte, fecha_limite
   `;
   return actualizado ?? null;

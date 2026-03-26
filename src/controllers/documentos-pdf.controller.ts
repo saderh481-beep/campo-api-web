@@ -20,6 +20,13 @@ export async function postDocumentoPdf(c: Context<AppEnv>) {
     return c.json({ error: "archivo, clave y nombre son requeridos" }, 400);
   }
 
+  const nombreArchivo = archivo.name.toLowerCase();
+  const esPdfPorMime = archivo.type === "application/pdf";
+  const esPdfPorNombre = nombreArchivo.endsWith(".pdf");
+  if (!esPdfPorMime && !esPdfPorNombre) {
+    return c.json({ error: "El archivo debe ser PDF" }, 400);
+  }
+
   const row = await crearDocumentoPdf(
     archivo,
     {

@@ -50,6 +50,7 @@ export async function actualizarTecnico(id: string, body: TecnicoUpdateInput) {
   }
 
   const actualizado = await updateTecnico(id, body);
+  if (!actualizado) return { status: 404 as const, body: { error: "Técnico no encontrado" } };
   return { status: 200 as const, body: actualizado };
 }
 
@@ -93,6 +94,7 @@ export async function cerrarCorte(id: string, userId: string, rol: string) {
   }
 
   const actualizado = await cerrarCorteById(id);
+  if (!actualizado) return { status: 404 as const, body: { error: "Asignación de corte no encontrada" } };
   return { status: 200 as const, body: { message: "Período cerrado", tecnico: actualizado } };
 }
 

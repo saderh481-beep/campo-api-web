@@ -1,5 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { redis } from "@/lib/redis";
+import { findConfiguracionByClave } from "@/models/configuraciones.model";
+import { findTecnicoDetalleParaLogin, marcarTecnicoVencido } from "@/models/auth.model";
 import type { JwtPayload } from "@/lib/jwt";
 import type { AppEnv, SessionPayload } from "@/types/http";
 
@@ -22,9 +24,39 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     return c.json({ error: "Sesion invalida" }, 401);
   }
 
-  // Bloqueo automático: técnicos con fecha de corte global vencida
-  if (session.rol === "tecnico" && session.fecha_limite) {
-    if (new Date(session.fecha_limite) < new Date()) {
+  // Bloqueo automático y sincronización del estado de corte para técnicos.
+  // Se consulta el estado vigente en BD en cada request para evitar sesiones desfasadas.
+  if (session.rol === "tecnico") {
+    const tecnico = await findTecnicoDetalleParaLogin(session.usuario_id);
+    if (!tecnico) {
+      await redis.del(`session:${token}`);
+      return c.json({ error: "Sesion invalida" }, 401);
+    }
+
+    if (tecnico.estado_corte === "baja" || tecnico.estado_corte === "corte_aplicado") {
+      await redis.del(`session:${token}`);
+      return c.json(
+        { error: "periodo_vencido", message: "Tu período de acceso ha concluido." },
+        401
+      );
+    }
+
+    const configCorte = await findConfiguracionByClave("fecha_corte_global");
+    const fechaConfigurada = (configCorte?.valor as { fecha?: unknown } | null)?.fecha;
+    const fechaCorteGlobal = typeof fechaConfigurada === "string" && fechaConfigurada.trim().length > 0
+      ? fechaConfigurada
+      : null;
+
+    if (!fechaCorteGlobal) {
+      await redis.del(`session:${token}`);
+      return c.json(
+        { error: "periodo_no_configurado", message: "No hay fecha de corte global configurada." },
+        401
+      );
+    }
+
+    if (new Date(fechaCorteGlobal) <= new Date()) {
+      await marcarTecnicoVencido(session.usuario_id);
       await redis.del(`session:${token}`);
       return c.json(
         { error: "periodo_vencido", message: "Tu período de acceso ha concluido." },
