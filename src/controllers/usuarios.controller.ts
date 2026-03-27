@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { AppEnv } from "@/types/http";
-import { crearUsuario, editarUsuario, eliminarUsuario, listarUsuarios } from "@/services/usuarios.service";
+import { crearUsuario, editarUsuario, eliminarUsuario, eliminarUsuarioFisico, listarUsuarios } from "@/services/usuarios.service";
 import type { UsuarioInput, UsuarioUpdateInput } from "@/models/usuarios.model";
 
 export async function getUsuarios(c: Context<AppEnv>) {
@@ -23,5 +23,12 @@ export async function deleteUsuario(c: Context<AppEnv>) {
   const { id } = c.req.param();
   const user = c.get("user");
   const result = await eliminarUsuario(id, user.sub);
+  return c.json(result.body, result.status);
+}
+
+export async function deleteUsuarioFisico(c: Context<AppEnv>) {
+  const { id } = c.req.param();
+  const user = c.get("user");
+  const result = await eliminarUsuarioFisico(id, user.sub);
   return c.json(result.body, result.status);
 }

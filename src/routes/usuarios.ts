@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { AppEnv } from "@/types/http";
-import { deleteUsuario, getUsuarios, patchUsuario, postUsuario } from "@/controllers/usuarios.controller";
+import { deleteUsuario, getUsuarios, patchUsuario, postUsuario, deleteUsuarioFisico } from "@/controllers/usuarios.controller";
 
 const app = new Hono<AppEnv>();
 
@@ -47,6 +47,12 @@ app.delete(
   "/:id",
   zValidator("param", z.object({ id: z.string().uuid() })),
   deleteUsuario
+);
+
+app.delete(
+  "/:id/force",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  deleteUsuarioFisico
 );
 
 export default app;

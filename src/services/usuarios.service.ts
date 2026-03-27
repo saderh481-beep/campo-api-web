@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import {
   createUsuario,
   deactivateUsuario,
+  deleteUsuarioFisico,
   existsUsuarioByCodigo,
   existsUsuarioByCorreo,
   findUsuarioById,
@@ -75,14 +76,30 @@ export async function editarUsuario(id: string, input: UsuarioUpdateInput) {
 
 export async function eliminarUsuario(id: string, actorId: string) {
   if (id === actorId) return { status: 400 as const, body: { error: "No puedes desactivar tu propia cuenta" } };
-
+  
   const usuario = await findUsuarioById(id);
   if (!usuario) return { status: 404 as const, body: { error: "Usuario no encontrado" } };
-
+  
   if (usuario.rol === "tecnico") {
     await updateTecnicoDetalle(id, { activo: false, estado_corte: "baja" });
   }
-
+  
   await deactivateUsuario(id);
   return { status: 200 as const, body: { message: "Usuario desactivado" } };
+}
+
+export async function eliminarUsuarioFisico(id: string, actorId: string) {
+  if (id === actorId) return { status: 400 as const, body: { error: "No puedes eliminar tu propia cuenta" } };
+  
+  const usuario = await findUsuarioById(id);
+  if (!usuario) return { status: 404 as const, body: { error: "Usuario no encontrado" } };
+  
+  if (usuario.rol === "tecnico") {
+    await updateTecnicoDetalle(id, { activo: false, estado_corte: "baja" });
+  }
+  
+  const result = await deleteUsuarioFisico(id);
+  if (!result) return { status: 404 as const, body: { error: "Usuario no encontrado" } };
+  
+  return { status: 200 as const, body: { message: "Usuario eliminado permanentemente", usuario: result } };
 }

@@ -81,6 +81,15 @@ export async function deactivateUsuario(id: string) {
   return row ?? null;
 }
 
+export async function deleteUsuarioFisico(id: string) {
+  const [row] = await sql`
+    DELETE FROM usuarios
+    WHERE id = ${id}
+    RETURNING id, nombre, correo, rol, activo, created_at, updated_at
+  `;
+  return row ?? null;
+}
+
 export async function findCoordinadorActivo(id: string) {
   const [row] = await sql`
     SELECT id FROM usuarios WHERE id = ${id} AND rol = 'coordinador' AND activo = true
