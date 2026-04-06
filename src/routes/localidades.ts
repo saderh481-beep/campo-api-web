@@ -1,18 +1,20 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { deleteLocalidad, getLocalidades, patchLocalidad, postLocalidad } from "@/controllers/localidades.controller";
 import { authMiddleware, requireRole } from "@/middleware/auth";
+import { createLocalidad, deactivateLocalidad, listLocalidades, updateLocalidad, type LocalidadInput, type LocalidadUpdateInput } from "@/models/localidades.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
 app.use("*", authMiddleware, requireRole("admin"));
 
-app.get("/", getLocalidades);
+app.get("/", async (c) => {
+  const rows = await listLocalidades();
+  return c.json(rows);
+});
 
 app.post(
   "/",
-  requireRole("admin"),
   zValidator(
     "json",
     z.object({
@@ -25,12 +27,16 @@ app.post(
         .optional(),
     })
   ),
-  (c) => postLocalidad(c, c.req.valid("json"))
+  async (c) => {
+    const user = c.get("user");
+    const body = c.req.valid("json") as LocalidadInput;
+    const row = await createLocalidad(body, user.sub);
+    return c.json(row, 201);
+  }
 );
 
 app.patch(
   "/:id",
-  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -44,14 +50,24 @@ app.patch(
         .optional(),
     })
   ),
-  (c) => patchLocalidad(c, c.req.valid("json"))
+  async (c) => {
+    const { id } = c.req.param();
+    const body = c.req.valid("json") as LocalidadUpdateInput;
+    const row = await updateLocalidad(id, body);
+    if (!row) return c.json({ error: "Localidad no encontrada" }, 404);
+    return c.json(row);
+  }
 );
 
 app.delete(
   "/:id",
-  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
-  deleteLocalidad
+  async (c) => {
+    const { id } = c.req.param();
+    const row = await deactivateLocalidad(id);
+    if (!row) return c.json({ error: "Localidad no encontrada" }, 404);
+    return c.json({ message: "Localidad desactivada" });
+  }
 );
 
 export default app;

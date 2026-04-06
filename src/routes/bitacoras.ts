@@ -1,9 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { createHash } from "node:crypto";
 import { sql } from "@/db";
-import { subirPDF } from "@/lib/cloudinary";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { generarPdfBitacora } from "@/lib/pdf";
 import type { PdfConfig } from "@/lib/pdf";
@@ -231,26 +229,6 @@ app.post(
 
   const pdfConfig = await cargarPdfConfig();
   const pdfBytes = await generarPdfBitacora(bitacora, { impresion: true }, pdfConfig);
-
-  const buffer = Buffer.from(pdfBytes);
-  const sha256 = createHash("sha256").update(buffer).digest("hex");
-
-  const [{ next_version }] = await sql`
-    SELECT COALESCE(MAX(version), 0) + 1 AS next_version
-    FROM pdf_versiones
-    WHERE bitacora_id = ${id}
-  `;
-
-  const { secure_url } = await subirPDF(
-    buffer,
-    `campo/pdfs/${bitacora.tecnico_id}/${new Date().getMonth() + 1}`,
-    `bitacora-${id}-impresion-${Date.now()}`
-  );
-
-  await sql`
-    INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
-    VALUES (${id}, ${next_version}, ${secure_url}, ${sha256}, false, ${user.sub})
-  `;
 
   return new Response(Buffer.from(pdfBytes), {
     headers: { "Content-Type": "application/pdf" },
