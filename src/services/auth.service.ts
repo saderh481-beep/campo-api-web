@@ -11,6 +11,18 @@ import type { SessionPayload } from "@/types/http";
 
 const SESSION_TTL_SECONDS = 86400;
 
+interface SessionCache {
+  usuario_id: string;
+  nombre: string;
+  correo: string;
+  rol: string;
+  created_at: string;
+  fecha_limite?: string;
+  login_at: string;
+  ip?: string;
+  user_agent?: string;
+}
+
 type LoginInput = {
   correo: string;
   codigo_acceso: string;
@@ -85,16 +97,19 @@ export async function iniciarSesion(input: LoginInput, client: ClientMetadata) {
 
   const token = randomUUID();
   const createdAt = new Date().toISOString();
-  const sessionPayload: SessionPayload = {
+  const sessionCache: SessionCache = {
     usuario_id: usuario.id,
-    rol: usuario.rol,
     nombre: usuario.nombre,
     correo: usuario.correo,
+    rol: usuario.rol,
     created_at: createdAt,
+    login_at: createdAt,
+    ip: client.ip,
+    user_agent: client.userAgent ?? undefined,
     ...(fechaCorteGlobal ? { fecha_limite: fechaCorteGlobal } : {}),
   };
 
-  await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionPayload));
+  await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionCache));
   await createAuthLog(usuario.id, "login", client.ip, client.userAgent);
 
   return {

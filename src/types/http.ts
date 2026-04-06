@@ -12,6 +12,9 @@ export type SessionPayload = {
   correo: string;
   created_at: string;
   fecha_limite?: string;
+  login_at?: string;
+  ip?: string;
+  user_agent?: string;
 };
 
 export type AppEnv = {
