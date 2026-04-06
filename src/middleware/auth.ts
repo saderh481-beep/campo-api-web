@@ -33,7 +33,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
       return c.json({ error: "Sesion invalida" }, 401);
     }
 
-    if (tecnico.estado_corte === "baja" || tecnico.estado_corte === "corte_aplicado") {
+    if (tecnico.estado_corte === "baja" || tecnico.estado_corte === "suspendido") {
       await redis.del(`session:${token}`);
       return c.json(
         { error: "periodo_vencido", message: "Tu período de acceso ha concluido." },
@@ -77,7 +77,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 });
 
 function normalizeRole(role: string): string {
-  return role === "admin" ? "administrador" : role;
+  return role;
 }
 
 export function requireRole(...roles: string[]) {

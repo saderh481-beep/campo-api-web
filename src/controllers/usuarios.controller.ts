@@ -13,9 +13,9 @@ export async function postUsuario(c: Context<AppEnv>, body: UsuarioInput) {
   return c.json(result.body, result.status);
 }
 
-export async function patchUsuario(c: Context<AppEnv>, body: UsuarioUpdateInput) {
+export async function patchUsuario(c: Context<AppEnv>, body: UsuarioUpdateInput & { rol?: string }) {
   const { id } = c.req.param();
-  const result = await editarUsuario(id, body);
+  const result = await editarUsuario(id, body, body.rol);
   return c.json(result.body, result.status);
 }
 

@@ -12,7 +12,7 @@ const app = new Hono<{
     user: JwtPayload
   }
 }>();
-app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+app.use("*", authMiddleware, requireRole("admin", "coordinador"));
 
 function encodePhone(value?: string): string | null {
   if (!value) return null;
@@ -39,7 +39,7 @@ async function existsLocalidadActiva(localidadId: string): Promise<boolean> {
 app.get("/", async (c) => {
   const user = c.get("user");
   const beneficiarios =
-    user.rol === "administrador"
+    user.rol === "admin"
       ? await sql`
           SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
                  b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
@@ -68,7 +68,7 @@ app.get(
   const user = c.get("user");
   const { id } = c.req.valid("param");
   const [beneficiario] =
-    user.rol === "administrador"
+    user.rol === "admin"
       ? await sql`SELECT * FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.*
@@ -189,7 +189,7 @@ app.patch(
     const coordParcela = normalizePoint(body.coord_parcela);
 
     const [beneficiarioActual] =
-      user.rol === "administrador"
+      user.rol === "admin"
         ? await sql`SELECT id, tecnico_id FROM beneficiarios WHERE id = ${id} AND activo = true`
         : await sql`
             SELECT b.id, b.tecnico_id
@@ -274,7 +274,7 @@ app.delete(
   const { id } = c.req.valid("param");
 
   const [beneficiario] =
-    user.rol === "administrador"
+    user.rol === "admin"
       ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.id
@@ -313,7 +313,7 @@ app.delete(
 
 app.post(
   "/:id/cadenas",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ cadena_ids: z.array(z.string().uuid()) })),
   async (c) => {
@@ -322,7 +322,7 @@ app.post(
     const { cadena_ids } = c.req.valid("json");
 
     const [beneficiario] =
-      user.rol === "administrador"
+      user.rol === "admin"
         ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
         : await sql`
             SELECT b.id
@@ -364,7 +364,7 @@ app.post(
   const user = c.get("user");
 
   const [beneficiario] =
-    user.rol === "administrador"
+    user.rol === "admin"
       ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.id
@@ -402,7 +402,7 @@ app.get(
   const user = c.get("user");
 
   const [beneficiario] =
-    user.rol === "administrador"
+    user.rol === "admin"
       ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
       : await sql`
           SELECT b.id

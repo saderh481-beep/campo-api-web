@@ -7,7 +7,7 @@ import { deleteDocumentoPdf, getDocumentosPdf, patchDocumentoPdf, postDocumentoP
 
 const app = new Hono<AppEnv>();
 
-app.use("*", authMiddleware, requireRole("administrador"));
+app.use("*", authMiddleware, requireRole("admin"));
 app.get("/", getDocumentosPdf);
 app.post("/", postDocumentoPdf);
 app.patch(

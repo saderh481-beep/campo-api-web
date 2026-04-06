@@ -8,13 +8,13 @@ import type { AppEnv } from "@/types/http";
 const app = new Hono<AppEnv>();
 app.use("*", authMiddleware);
 
-app.get("/", requireRole("administrador"), getConfiguraciones);
+app.get("/", requireRole("admin"), getConfiguraciones);
 
-app.get("/:clave", requireRole("administrador"), getConfiguracion);
+app.get("/:clave", requireRole("admin"), getConfiguracion);
 
 app.put(
   "/:clave",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("json", z.object({ valor: z.record(z.string(), z.unknown()) })),
   (c) => putConfiguracion(c, c.req.valid("json").valor)
 );

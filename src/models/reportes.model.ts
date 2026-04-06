@@ -33,7 +33,7 @@ export async function getReporteMensualCoordinador(coordinadorId: string, mes: n
 }
 
 export async function canAccessTecnicoReporte(rol: string, tecnicoId: string, coordinadorId: string) {
-  const [row] = rol === "administrador"
+  const [row] = rol === "admin"
     ? await sql`SELECT id FROM usuarios WHERE id = ${tecnicoId} AND rol = 'tecnico' AND activo = true`
     : await sql`
         SELECT t.id FROM usuarios t

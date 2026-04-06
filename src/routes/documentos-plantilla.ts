@@ -12,15 +12,15 @@ import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("administrador"));
+app.use("*", authMiddleware, requireRole("admin"));
 
-app.get("/", requireRole("administrador"), getDocumentosPlantilla);
+app.get("/", requireRole("admin"), getDocumentosPlantilla);
 
 app.get("/activos", getDocumentosPlantillaActivos);
 
 app.post(
   "/",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator(
     "json",
     z.object({
@@ -36,7 +36,7 @@ app.post(
 
 app.patch(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -53,7 +53,7 @@ app.patch(
 
 app.delete(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   deleteDocumentoPlantilla
 );

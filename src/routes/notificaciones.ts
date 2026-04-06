@@ -10,7 +10,7 @@ import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("administrador", "tecnico"));
+app.use("*", authMiddleware, requireRole("admin", "tecnico"));
 
 app.get("/", getNotificaciones);
 

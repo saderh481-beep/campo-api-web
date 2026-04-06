@@ -1,5 +1,4 @@
-import { compare } from "bcryptjs";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { redis } from "@/lib/redis";
 import {
   createAuthLog,
@@ -22,6 +21,10 @@ type ClientMetadata = {
   userAgent: string | null;
 };
 
+function hashSHA512(input: string): string {
+  return createHash("sha512").update(input).digest("hex");
+}
+
 export async function solicitarCodigoAcceso() {
   return {
     message: "Este endpoint ya no genera codigos. Usa el codigo_acceso asignado al usuario.",
@@ -34,7 +37,8 @@ export async function iniciarSesion(input: LoginInput, client: ClientMetadata) {
     return { status: 401 as const, body: { error: "Credenciales invalidas" } };
   }
 
-  const valido = await compare(input.codigo_acceso, usuario.hash_codigo_acceso);
+  const hashIngresado = hashSHA512(input.codigo_acceso);
+  const valido = hashIngresado === usuario.hash_codigo_acceso;
   if (!valido) {
     return { status: 401 as const, body: { error: "Credenciales invalidas" } };
   }

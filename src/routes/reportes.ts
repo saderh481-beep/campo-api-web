@@ -6,7 +6,7 @@ import type { AppEnv } from "@/types/http";
 import { getReporteMensual, getReporteTecnico } from "@/controllers/reportes.controller";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+app.use("*", authMiddleware, requireRole("admin", "coordinador"));
 
 app.get(
   "/mensual",

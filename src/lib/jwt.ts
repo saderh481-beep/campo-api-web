@@ -5,7 +5,7 @@ const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export type JwtPayload = {
   sub: string;
-  rol: "administrador" | "coordinador" | "tecnico";
+  rol: "admin" | "coordinador" | "tecnico";
   nombre: string;
   correo?: string;
 };

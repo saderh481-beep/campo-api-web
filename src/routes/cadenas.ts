@@ -6,20 +6,20 @@ import type { AppEnv } from "@/types/http";
 import { deleteCadena, getCadenas, patchCadena, postCadena } from "@/controllers/cadenas.controller";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("administrador"));
+app.use("*", authMiddleware, requireRole("admin"));
 
 app.get("/", getCadenas);
 
 app.post(
   "/",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
   (c) => postCadena(c, c.req.valid("json"))
 );
 
 app.patch(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -30,7 +30,7 @@ app.patch(
 
 app.delete(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   deleteCadena
 );

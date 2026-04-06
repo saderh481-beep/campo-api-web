@@ -6,7 +6,7 @@ import {
 } from "@/models/reportes.model";
 
 export async function obtenerReporteMensual(rol: string, coordinadorId: string, mes: number, anio: number) {
-  const tecnicos = rol === "administrador"
+  const tecnicos = rol === "admin"
     ? await getReporteMensualAdmin(mes, anio)
     : await getReporteMensualCoordinador(coordinadorId, mes, anio);
 

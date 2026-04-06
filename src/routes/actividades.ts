@@ -8,18 +8,18 @@ import { deleteActividad, getActividades, patchActividad, postActividad } from "
 const app = new Hono<AppEnv>();
 app.use("*", authMiddleware);
 
-app.get("/", requireRole("administrador", "coordinador"), getActividades);
+app.get("/", requireRole("admin", "coordinador"), getActividades);
 
 app.post(
   "/",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
   (c) => postActividad(c, c.req.valid("json"))
 );
 
 app.patch(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -30,7 +30,7 @@ app.patch(
 
 app.delete(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   deleteActividad
 );

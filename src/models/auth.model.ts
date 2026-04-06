@@ -4,7 +4,7 @@ export async function findUsuarioParaLogin(correo: string) {
   const [usuario] = await sql`
     SELECT id, nombre, correo, rol, hash_codigo_acceso
     FROM usuarios
-    WHERE correo = ${correo} AND activo = true
+    WHERE correo = ${correo}
   `;
   return usuario;
 }
@@ -14,7 +14,7 @@ export async function findTecnicoDetalleParaLogin(usuarioId: string) {
     SELECT td.fecha_limite, td.estado_corte
     FROM tecnico_detalles td
     JOIN usuarios u ON u.id = td.tecnico_id
-    WHERE td.tecnico_id = ${usuarioId} AND u.rol = 'tecnico' AND td.activo = true AND u.activo = true
+    WHERE td.tecnico_id = ${usuarioId} AND u.rol = 'tecnico' AND td.activo = true
   `;
   return tecnico;
 }
@@ -22,7 +22,7 @@ export async function findTecnicoDetalleParaLogin(usuarioId: string) {
 export async function marcarTecnicoVencido(usuarioId: string) {
   await sql`
     UPDATE tecnico_detalles
-    SET estado_corte = 'corte_aplicado', updated_at = NOW()
+    SET estado_corte = 'suspendido', updated_at = NOW()
     WHERE tecnico_id = ${usuarioId} AND activo = true
   `;
 }

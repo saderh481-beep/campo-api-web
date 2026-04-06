@@ -23,7 +23,7 @@ import {
 } from "@/controllers/asignaciones.controller";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("administrador"));
+app.use("*", authMiddleware, requireRole("admin"));
 
 app.get(
   "/coordinador-tecnico",

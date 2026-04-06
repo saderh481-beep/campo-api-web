@@ -17,18 +17,18 @@ const app = new Hono<AppEnv>();
 
 app.use("*", authMiddleware);
 
-app.get("/", requireRole("administrador", "coordinador"), getTecnicos);
+app.get("/", requireRole("admin", "coordinador"), getTecnicos);
 
 app.get(
   "/:id",
-  requireRole("administrador", "coordinador"),
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   getTecnicoById
 );
 
 app.post(
   "/",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator(
     "json",
     z.object({
@@ -53,7 +53,7 @@ app.post(
 
 app.patch(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -73,25 +73,25 @@ app.patch(
 
 app.post(
   "/:id/codigo",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   postTecnicoCodigo
 );
 
 // POST /aplicar-cortes — batch: aplica estado_corte a todos los vencidos (solo admin)
-app.post("/aplicar-cortes", requireRole("administrador"), postAplicarCortes);
+app.post("/aplicar-cortes", requireRole("admin"), postAplicarCortes);
 
 // POST /:id/cerrar-corte — cierre manual por coordinador o admin
 app.post(
   "/:id/cerrar-corte",
-  requireRole("administrador", "coordinador"),
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   postCerrarCorte
 );
 
 app.delete(
   "/:id",
-  requireRole("administrador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   deleteTecnico
 );

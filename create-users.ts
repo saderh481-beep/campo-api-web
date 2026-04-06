@@ -1,9 +1,13 @@
-import { hash } from "bcryptjs";
+import { createHash } from "node:crypto";
+
+function hashSHA512(input: string): string {
+  return createHash("sha512").update(input).digest("hex");
+}
 
 type SeedUser = {
   correo: string;
   nombre: string;
-  rol: "administrador" | "coordinador" | "tecnico";
+  rol: "admin" | "coordinador" | "tecnico";
   codigo: string;
 };
 
@@ -11,7 +15,7 @@ const seedUsers: SeedUser[] = [
   {
     correo: process.env.ADMIN_EMAIL ?? "admin@campo.local",
     nombre: process.env.ADMIN_NAME ?? "Administrador General",
-    rol: "administrador",
+    rol: "admin",
     codigo: process.env.ADMIN_CODIGO ?? "654321",
   },
   {
@@ -51,18 +55,16 @@ async function main() {
     const upserted: Array<{ correo: string; rol: string; codigo: string; id: string }> = [];
 
     for (const user of seedUsers) {
-      const hashedCodigo = await hash(user.codigo, 12);
+      const hashedCodigo = hashSHA512(user.codigo);
       const [row] = await sql`
-        INSERT INTO usuarios (correo, nombre, rol, codigo_acceso, hash_codigo_acceso, activo)
-        VALUES (${user.correo}, ${user.nombre}, ${user.rol}, ${user.codigo}, ${hashedCodigo}, true)
+        INSERT INTO usuarios (correo, nombre, rol, codigo_acceso, hash_codigo_acceso)
+        VALUES (${user.correo}, ${user.nombre}, ${user.rol}, ${user.codigo}, ${hashedCodigo})
         ON CONFLICT (correo)
         DO UPDATE SET
           nombre = EXCLUDED.nombre,
           rol = EXCLUDED.rol,
           codigo_acceso = EXCLUDED.codigo_acceso,
-          hash_codigo_acceso = EXCLUDED.hash_codigo_acceso,
-          activo = true,
-          updated_at = NOW()
+          hash_codigo_acceso = EXCLUDED.hash_codigo_acceso
         RETURNING id, correo, rol
       `;
 

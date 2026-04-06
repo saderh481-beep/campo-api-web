@@ -8,7 +8,7 @@ import { deleteUsuario, getUsuarios, patchUsuario, postUsuario, deleteUsuarioFis
 const app = new Hono<AppEnv>();
 
 app.use("*", authMiddleware);
-app.use("*", requireRole("administrador"));
+app.use("*", requireRole("admin"));
 
 app.get("/", getUsuarios);
 
@@ -19,8 +19,7 @@ app.post(
     z.object({
       correo: z.string().email(),
       nombre: z.string().min(2),
-      rol: z.enum(["tecnico", "coordinador", "administrador"]),
-      telefono: z.string().optional(),
+      rol: z.enum(["tecnico", "coordinador", "admin"]),
     })
   ),
   (c) => postUsuario(c, c.req.valid("json"))
@@ -34,9 +33,8 @@ app.patch(
     z.object({
       nombre: z.string().min(2).optional(),
       correo: z.string().email().optional(),
-      rol: z.enum(["tecnico", "coordinador", "administrador"]).optional(),
+      rol: z.enum(["tecnico", "coordinador", "admin"]).optional(),
       codigo_acceso: z.string().regex(/^\d{5,6}$/).optional(),
-      telefono: z.string().optional(),
       activo: z.boolean().optional(),
     })
   ),

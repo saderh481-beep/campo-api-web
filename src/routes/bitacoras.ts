@@ -14,7 +14,7 @@ const app = new Hono<{
     user: JwtPayload;
   };
 }>();
-app.use("*", authMiddleware, requireRole("administrador", "coordinador"));
+app.use("*", authMiddleware, requireRole("admin", "coordinador"));
 
 app.get(
   "/",
@@ -76,15 +76,15 @@ app.get(
   async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
-  const [bitacora] =
-    user.rol === "administrador"
-      ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
-      : await sql`
-          SELECT b.* FROM bitacoras b
-          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
-        `;
+    const [bitacora] =
+      user.rol === "admin"
+        ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
+        : await sql`
+            SELECT b.* FROM bitacoras b
+            JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
+            JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
+          `;
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
   return c.json(bitacora);
 }
@@ -106,7 +106,7 @@ app.patch(
     const body = c.req.valid("json");
 
     const [pertenece] =
-      user.rol === "administrador"
+      user.rol === "admin"
         ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
         : await sql`
             SELECT b.id FROM bitacoras b
@@ -138,7 +138,7 @@ app.patch(
     const { pdf_edicion } = c.req.valid("json");
 
     const [pertenece] =
-      user.rol === "administrador"
+      user.rol === "admin"
         ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
         : await sql`
             SELECT b.id FROM bitacoras b
@@ -161,7 +161,7 @@ app.patch(
 );
 
 async function obtenerBitacoraConAcceso(id: string, userId: string, rol: string) {
-  return rol === "administrador"
+  return rol === "admin"
     ? (await sql`SELECT * FROM bitacoras WHERE id = ${id}`)[0]
     : (
         await sql`

@@ -6,7 +6,7 @@ import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("administrador"));
+app.use("*", authMiddleware, requireRole("admin"));
 
 app.get("/", getArchiveLogs);
 
