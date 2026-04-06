@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { subirPDF } from "@/lib/cloudinary";
+import { subirPDF } from "@/lib/campo-files";
 import {
   createDocumentoPdf,
   deactivateDocumentoPdf,
@@ -15,8 +15,8 @@ export async function listarDocumentosPdf() {
 export async function crearDocumentoPdf(file: File, metadata: { clave: string; nombre: string; descripcion?: string }, userId: string) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const sha256 = createHash("sha256").update(buffer).digest("hex");
-  const publicId = `${metadata.clave}_${Date.now()}`;
-  const upload = await subirPDF(buffer, "campo/plantillas-pdf", publicId);
+  const publicId = `campo/plantillas-pdf/${metadata.clave}_${Date.now()}`;
+  const upload = await subirPDF(publicId, buffer, `${metadata.clave}_${Date.now()}.pdf`);
 
   return createDocumentoPdf({
     clave: metadata.clave,
@@ -24,7 +24,7 @@ export async function crearDocumentoPdf(file: File, metadata: { clave: string; n
     descripcion: metadata.descripcion,
     mimeType: file.type || "application/pdf",
     bytes: buffer.length,
-    r2Key: upload.secure_url,
+    r2Key: upload.url,
     sha256,
     createdBy: userId,
   });

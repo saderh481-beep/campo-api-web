@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { sql } from "@/db";
-import { subirDocumento } from "@/lib/cloudinary";
+import { subirDocumentos } from "@/lib/campo-files";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
 
@@ -382,12 +382,11 @@ app.post(
 
   const buffer = Buffer.from(await archivo.arrayBuffer());
   const sha256 = createHash("sha256").update(buffer).digest("hex");
-  const publicId = `${id}_${Date.now()}`;
-  const { secure_url } = await subirDocumento(buffer, `campo/docs/${id}`, publicId);
+  const result = await subirDocumentos(id, [{ buffer, name: archivo.name }]);
 
   const [doc] = await sql`
     INSERT INTO documentos (beneficiario_id, tipo, nombre_original, r2_key, sha256, bytes, subido_por)
-    VALUES (${id}, ${tipo}, ${archivo.name}, ${secure_url}, ${sha256}, ${buffer.length}, ${user.sub})
+    VALUES (${id}, ${tipo}, ${archivo.name}, ${result[0].url}, ${sha256}, ${buffer.length}, ${user.sub})
     RETURNING id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
   `;
   return c.json(doc, 201);

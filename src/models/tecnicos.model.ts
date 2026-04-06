@@ -124,7 +124,7 @@ export async function applyCortesVencidos() {
 
   return sql`
     UPDATE tecnico_detalles td
-    SET estado_corte = 'corte_aplicado',
+    SET estado_corte = 'suspendido',
         updated_at   = NOW()
     FROM usuarios t
     WHERE td.tecnico_id = t.id
@@ -140,7 +140,7 @@ export async function applyCortesVencidos() {
 export async function cerrarCorteById(id: string) {
   const [actualizado] = await sql`
     UPDATE tecnico_detalles
-    SET estado_corte = 'corte_aplicado',
+    SET estado_corte = 'suspendido',
         updated_at   = NOW()
     WHERE tecnico_id = ${id} AND activo = true
     RETURNING tecnico_id AS id, estado_corte, fecha_limite

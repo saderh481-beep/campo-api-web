@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { sql } from "@/db";
-import { subirPDF } from "@/lib/cloudinary";
+import { subirPDF } from "@/lib/campo-files";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { generarPdfBitacora } from "@/lib/pdf";
 import type { PdfConfig } from "@/lib/pdf";
@@ -241,15 +241,12 @@ app.post(
     WHERE bitacora_id = ${id}
   `;
 
-  const { secure_url } = await subirPDF(
-    buffer,
-    `campo/pdfs/${bitacora.tecnico_id}/${new Date().getMonth() + 1}`,
-    `bitacora-${id}-impresion-${Date.now()}`
-  );
+  const publicId = `bitacoras/${bitacora.tecnico_id}/${new Date().getMonth() + 1}/bitacora-${id}-impresion-${Date.now()}`;
+  const upload = await subirPDF(publicId, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
 
   await sql`
     INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
-    VALUES (${id}, ${next_version}, ${secure_url}, ${sha256}, false, ${user.sub})
+    VALUES (${id}, ${next_version}, ${upload.url}, ${sha256}, false, ${user.sub})
   `;
 
   return new Response(Buffer.from(pdfBytes), {

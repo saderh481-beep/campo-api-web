@@ -9,7 +9,7 @@ export type TecnicoDetalleInput = {
 export type TecnicoDetalleUpdateInput = {
   coordinador_id?: string;
   fecha_limite?: string;
-  estado_corte?: "en_servicio" | "corte_aplicado" | "baja";
+  estado_corte?: "activo" | "en_servicio" | "suspendido" | "baja";
   activo?: boolean;
 };
 

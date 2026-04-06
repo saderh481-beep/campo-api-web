@@ -1,55 +1,50 @@
 import type { Context } from "hono";
 import type { AppEnv } from "@/types/http";
-import {
-  actualizarTecnico,
-  aplicarCortes,
-  cerrarCorte,
-  eliminarTecnico,
-  listarTecnicos,
-  obtenerTecnicoDetalle,
-  regenerarCodigoTecnico,
-} from "@/services/tecnicos.service";
-import type { TecnicoUpdateInput } from "@/models/tecnicos.model";
+import { TecnicoService } from "@/services/tecnico.service";
+import { CodigoAccesoService } from "@/validators/codigo-acceso.validator";
+import type { TecnicoUpdate } from "@/domain/entities/tecnico.entity";
+
+const tecnicoService = new TecnicoService(new CodigoAccesoService());
 
 export async function getTecnicos(c: Context<AppEnv>) {
   const user = c.get("user");
-  const rows = await listarTecnicos(user.sub, user.rol);
+  const rows = await tecnicoService.listar(user.sub, user.rol);
   return c.json(rows);
 }
 
 export async function getTecnicoById(c: Context<AppEnv>) {
   const { id } = c.req.param();
   const user = c.get("user");
-  const result = await obtenerTecnicoDetalle(id, user.sub, user.rol);
+  const result = await tecnicoService.obtenerDetalle(id, user.sub, user.rol);
   return c.json(result.body, result.status);
 }
 
-export async function patchTecnicoWithBody(c: Context<AppEnv>, body: TecnicoUpdateInput) {
+export async function patchTecnicoWithBody(c: Context<AppEnv>, body: TecnicoUpdate) {
   const { id } = c.req.param();
-  const result = await actualizarTecnico(id, body);
+  const result = await tecnicoService.actualizar(id, body);
   return c.json(result.body, result.status);
 }
 
 export async function postTecnicoCodigo(c: Context<AppEnv>) {
   const { id } = c.req.param();
-  const result = await regenerarCodigoTecnico(id);
+  const result = await tecnicoService.regenerarCodigo(id);
   return c.json(result.body, result.status);
 }
 
 export async function postAplicarCortes(c: Context<AppEnv>) {
-  const result = await aplicarCortes();
+  const result = await tecnicoService.aplicarCortes();
   return c.json(result.body, result.status);
 }
 
 export async function postCerrarCorte(c: Context<AppEnv>) {
   const { id } = c.req.param();
   const user = c.get("user");
-  const result = await cerrarCorte(id, user.sub, user.rol);
+  const result = await tecnicoService.cerrarCorte(id, user.sub, user.rol);
   return c.json(result.body, result.status);
 }
 
 export async function deleteTecnico(c: Context<AppEnv>) {
   const { id } = c.req.param();
-  const result = await eliminarTecnico(id);
+  const result = await tecnicoService.eliminar(id);
   return c.json(result.body, result.status);
 }

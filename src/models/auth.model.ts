@@ -28,8 +28,9 @@ export async function marcarTecnicoVencido(usuarioId: string) {
 }
 
 export async function createAuthLog(actorId: string, accion: "login" | "logout", ip: string, userAgent: string | null) {
+  const validIp = ip === "unknown" ? null : ip;
   await sql`
     INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)
-    VALUES (${actorId}, 'usuario', ${accion}, ${ip}, ${userAgent})
+    VALUES (${actorId}, 'usuario', ${accion}, ${validIp}::inet, ${userAgent})
   `;
 }

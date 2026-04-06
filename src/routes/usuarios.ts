@@ -34,7 +34,7 @@ app.patch(
       nombre: z.string().min(2).optional(),
       correo: z.string().email().optional(),
       rol: z.enum(["tecnico", "coordinador", "admin"]).optional(),
-      codigo_acceso: z.string().regex(/^\d{5,6}$/).optional(),
+      codigo_acceso: z.string().optional(),
       activo: z.boolean().optional(),
     })
   ),

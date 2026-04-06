@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { getConfiguracion, getConfiguraciones, putConfiguracion } from "@/controllers/configuraciones.controller";
+import { getConfiguracion, getConfiguraciones, putConfiguracion } from "@/controllers/configuracion.controller";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { AppEnv } from "@/types/http";
 

@@ -55,11 +55,12 @@ export async function iniciarSesion(input: LoginInput, client: ClientMetadata) {
       : null;
 
     const vencido =
-      tecnico.estado_corte === "corte_aplicado" ||
+      tecnico.estado_corte === "suspendido" ||
+      tecnico.estado_corte === "baja" ||
       (fechaCorteGlobal && new Date(fechaCorteGlobal) <= new Date());
 
     if (vencido) {
-      if (tecnico.estado_corte !== "corte_aplicado") {
+      if (tecnico.estado_corte !== "suspendido" && tecnico.estado_corte !== "baja") {
         await marcarTecnicoVencido(usuario.id);
       }
 
