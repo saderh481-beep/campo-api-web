@@ -97,6 +97,9 @@ bun run typecheck
 
 ## Novedades recientes
 
+- Mejoras en manejo de errores: todos los endpoints ahora tienen try-catch para capturar errores de base de datos y retornar respuestas consistentes con codigo 500.
+- Middleware de autenticacion: mejor manejo de errores con try-catch en verificacion de JWT y estado del tecnico.
+- Modelo de usuarios: `deactivateUsuario` ahora establece `activo = false` correctamente.
 - Asignaciones: se documenta y expone el CRUD completo por relacion en un solo modulo: coordinador -> tecnico, tecnico -> beneficiario y tecnico -> actividad, incluyendo `GET /asignaciones/coordinador-tecnico/:tecnico_id`.
 - Tecnicos: `POST /tecnicos` se mantiene como ruta no soportada y responde `405`, dejando explicito que el alta real ocurre en `POST /usuarios` con `rol=tecnico`.
 - Bitacoras y notificaciones: las rutas con `:id` ahora validan UUID en params y responden `422` cuando el identificador es invalido.
@@ -1049,3 +1052,30 @@ Requiere rol administrador.
 - 403: Sin permisos por rol.
 - 404: Recurso no encontrado.
 - 409: Conflicto de datos (por ejemplo correo duplicado).
+- 422: Parametros de ruta invalidos (UUID malformado).
+- 500: Error interno del servidor.
+
+## Manejo de errores
+
+La API implementa manejo de errores robusto en todos los endpoints:
+
+### Middleware de autenticacion (`src/middleware/auth.ts`)
+- Validacion de token Bearer con soporte fallback JWT cuando Redis no esta disponible.
+- Verificacion de estado de corte para tecnicos en cada request.
+- Errores capturados y registrados en logs.
+
+### Rutas con try-catch
+Todos los handlers de rutas tienen try-catch para capturar errores de base de datos y retornar respuestas consistentes:
+
+- `/usuarios` - GET, POST, PATCH, DELETE
+- `/auth` - verify-codigo-acceso, logout
+- `/tecnicos` - GET, PATCH, POST, DELETE
+- `/beneficiarios` - GET, POST, PATCH, DELETE, POST documentos, GET documentos
+
+Errores típicos:
+- 500: "Error al obtener/crear/actualizar/eliminar [recurso]"
+- 401: "Token inválido o expirado", "Sesión inválida"
+- 403: "Sin permisos"
+
+### Modelo de usuarios
+- `deactivateUsuario` ahora establece `activo = false` correctamente (antes solo actualizaba `updated_at`).
