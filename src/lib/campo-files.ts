@@ -1,6 +1,6 @@
 const CAMPO_FILES_API = process.env.CAMPO_FILES_API_URL ?? "https://campo-api-files-campo-saas.up.railway.app";
-const API_KEY_WEB = process.env.CAMPO_FILES_API_KEY_WEB;
-const API_KEY_APP = process.env.CAMPO_FILES_API_KEY_APP;
+const API_KEY_WEB = process.env.API_KEY_WEB;
+const API_KEY_APP = process.env.API_KEY_APP;
 
 async function request<T>(
   endpoint: string,
