@@ -65,12 +65,13 @@ export async function updateUsuario(id: string, input: UsuarioUpdateInput & { ha
 }
 
 export async function deactivateUsuario(id: string) {
-  await sql`
+  const [row] = await sql`
     UPDATE usuarios
-    SET updated_at = NOW()
+    SET activo = false, updated_at = NOW()
     WHERE id = ${id}
+    RETURNING id, nombre, correo, codigo_acceso, hash_codigo_acceso
   `;
-  return findUsuarioById(id);
+  return row ?? null;
 }
 
 export async function deleteUsuarioFisico(id: string) {

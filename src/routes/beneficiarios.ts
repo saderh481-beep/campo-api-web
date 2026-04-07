@@ -6,6 +6,23 @@ import { sql } from "@/db";
 import { uploadBeneficiarioDocumentos } from "@/lib/files";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
+import {
+  listBeneficiariosByUser,
+  findBeneficiarioByIdWithAccess,
+  findBeneficiarioWithRelations,
+  findBeneficiarioById,
+  existsTecnicoActivo,
+  existsTecnicoActivoWithCoordinador,
+  createBeneficiarioWithAsignacion,
+  updateBeneficiarioWithAsignacion,
+  deactivateBeneficiario,
+  createBeneficiario,
+  updateBeneficiario,
+} from "@/models/beneficiarios.model";
+import { updateBeneficiarioCadenas, getCadenasByBeneficiarioId } from "@/models/beneficiario_cadenas.model";
+import { createDocumento, listDocumentosByBeneficiarioId } from "@/models/documentos.model";
+import { existsCadenasActivasByIds } from "@/models/cadenas.model";
+import { existsLocalidadActiva } from "@/models/localidades.model";
 
 const app = new Hono<{
   Variables: {
@@ -27,69 +44,39 @@ function normalizePoint(value?: string): string | null {
   return `(${match[1]},${match[2]})`;
 }
 
-async function existsLocalidadActiva(localidadId: string): Promise<boolean> {
-  const [row] = await sql`
-    SELECT id
-    FROM localidades
-    WHERE id = ${localidadId} AND activo = true
-  `;
-  return Boolean(row);
-}
-
 app.get("/", async (c) => {
-  const user = c.get("user");
-  const beneficiarios =
-    user.rol === "admin"
-      ? await sql`
-          SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
-                 b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
-                 b.coord_parcela, b.activo, b.created_at, b.updated_at
-          FROM beneficiarios b
-           WHERE b.activo = true
-          ORDER BY b.nombre
-        `
-      : await sql`
-          SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
-                 b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
-                 b.coord_parcela, b.activo, b.created_at, b.updated_at
-          FROM beneficiarios b
-          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-           WHERE td.coordinador_id = ${user.sub} AND b.activo = true
-          ORDER BY b.nombre
-        `;
-  return c.json(beneficiarios);
+  try {
+    const user = c.get("user");
+    const beneficiarios = await listBeneficiariosByUser(user.sub, user.rol);
+    return c.json(beneficiarios);
+  } catch (e) {
+    console.error("[Beneficiarios] Error al listar:", e);
+    return c.json({ error: "Error al obtener beneficiarios" }, 500);
+  }
 });
 
 app.get(
   "/:id",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const user = c.get("user");
-  const { id } = c.req.valid("param");
-  const [beneficiario] =
-    user.rol === "admin"
-      ? await sql`SELECT * FROM beneficiarios WHERE id = ${id} AND activo = true`
-      : await sql`
-          SELECT b.*
-          FROM beneficiarios b
-          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
-        `;
-  if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
-
-  const cadenas = await sql`
-    SELECT cp.id, cp.nombre
-    FROM beneficiario_cadenas bc
-    JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
-    WHERE bc.beneficiario_id = ${id} AND bc.activo = true AND cp.activo = true
-  `;
-  const documentos = await sql`
-    SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
-    FROM documentos WHERE beneficiario_id = ${id}
-  `;
-  return c.json({ ...beneficiario, cadenas, documentos });
-}
+    try {
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+      const beneficiario = await findBeneficiarioWithRelations(id);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+      
+      if (user.rol !== "admin") {
+        const beneficiarioBase = await findBeneficiarioById(id);
+        if (!beneficiarioBase) return c.json({ error: "Beneficiario no encontrado" }, 404);
+        const hasAccess = await existsTecnicoActivoWithCoordinador(beneficiarioBase.tecnico_id, user.sub);
+        if (!hasAccess) return c.json({ error: "Beneficiario no encontrado" }, 404);
+      }
+      return c.json(beneficiario);
+    } catch (e) {
+      console.error("[Beneficiarios] Error al obtener:", e);
+      return c.json({ error: "Error al obtener beneficiario" }, 500);
+    }
+  }
 );
 
 app.post(
@@ -110,57 +97,37 @@ app.post(
     })
   ),
   async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const coordParcela = normalizePoint(body.coord_parcela);
-
-    if (body.coord_parcela && !coordParcela) {
-      return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
-    }
-
-    if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
-      return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
-    }
-
-    const [tecnico] = await sql`
-      SELECT t.id, td.coordinador_id
-      FROM usuarios t
-      LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-      WHERE t.id = ${body.tecnico_id} AND t.rol = 'tecnico' AND t.activo = true
-    `;
-    if (!tecnico) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
-    if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
-      return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
-    }
-
-    const reserved = await sql.reserve();
-    let nuevo: Record<string, unknown>;
     try {
-      await reserved`BEGIN`;
-      const [row] = await reserved`
-        INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
-                                  telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-        VALUES (${body.nombre}, ${body.municipio}, ${body.localidad ?? null},
-                ${body.localidad_id ?? null}, ${body.direccion ?? null}, ${body.cp ?? null},
-                ${encodePhone(body.telefono_principal)},
-                ${encodePhone(body.telefono_secundario)}, ${coordParcela}::point, ${body.tecnico_id})
-        RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
-                  telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
-      `;
-      await reserved`
-        INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-        VALUES (${body.tecnico_id}, ${row.id}, ${user.sub})
-      `;
-      await reserved`COMMIT`;
-      nuevo = row;
-    } catch (err) {
-      await reserved`ROLLBACK`;
-      throw err;
-    } finally {
-      reserved.release();
-    }
+      const body = c.req.valid("json");
+      const user = c.get("user");
+      const coordParcela = normalizePoint(body.coord_parcela);
 
-    return c.json(nuevo, 201);
+      if (body.coord_parcela && !coordParcela) {
+        return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+      }
+
+      if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
+        return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
+      }
+
+      const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
+      if (!tecnicoValido) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
+      
+      if (user.rol === "coordinador") {
+        const tieneAcceso = await existsTecnicoActivoWithCoordinador(body.tecnico_id, user.sub);
+        if (!tieneAcceso) return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+      }
+
+      const nuevo = await createBeneficiarioWithAsignacion(
+        { ...body, coordParcela: coordParcela },
+        user.sub
+      );
+      if (!nuevo) return c.json({ error: "Error al crear beneficiario" }, 500);
+      return c.json(nuevo, 201);
+    } catch (e) {
+      console.error("[Beneficiarios] Error al crear:", e);
+      return c.json({ error: "Error al crear beneficiario" }, 500);
+    }
   }
 );
 
@@ -183,86 +150,53 @@ app.patch(
     })
   ),
   async (c) => {
-    const user = c.get("user");
-    const { id } = c.req.valid("param");
-    const body = c.req.valid("json");
-    const coordParcela = normalizePoint(body.coord_parcela);
-
-    const [beneficiarioActual] =
-      user.rol === "admin"
-        ? await sql`SELECT id, tecnico_id FROM beneficiarios WHERE id = ${id} AND activo = true`
-        : await sql`
-            SELECT b.id, b.tecnico_id
-            FROM beneficiarios b
-            JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
-          `;
-    if (!beneficiarioActual) return c.json({ error: "Beneficiario no encontrado" }, 404);
-
-    if (body.coord_parcela && !coordParcela) {
-      return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
-    }
-
-    if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
-      return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
-    }
-
-    if (body.tecnico_id) {
-      const [tecnico] = await sql`
-        SELECT t.id, td.coordinador_id
-        FROM usuarios t
-        LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-        WHERE t.id = ${body.tecnico_id} AND t.rol = 'tecnico' AND t.activo = true
-      `;
-      if (!tecnico) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
-      if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
-        return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
-      }
-    }
-
-    const nuevoTecnicoId = body.tecnico_id;
-    const reserved = await sql.reserve();
-    let actualizado: Record<string, unknown>;
     try {
-      await reserved`BEGIN`;
-      const [row] = await reserved`
-        UPDATE beneficiarios SET
-          nombre      = COALESCE(${body.nombre ?? null}, nombre),
-          municipio   = COALESCE(${body.municipio ?? null}, municipio),
-          localidad   = COALESCE(${body.localidad ?? null}, localidad),
-          localidad_id = COALESCE(${body.localidad_id ?? null}, localidad_id),
-          direccion   = COALESCE(${body.direccion ?? null}, direccion),
-          cp          = COALESCE(${body.cp ?? null}, cp),
-          telefono_principal  = COALESCE(${encodePhone(body.telefono_principal)}, telefono_principal),
-          telefono_secundario = COALESCE(${encodePhone(body.telefono_secundario)}, telefono_secundario),
-          coord_parcela = COALESCE(${coordParcela}::point, coord_parcela),
-          tecnico_id  = COALESCE(${nuevoTecnicoId ?? null}, tecnico_id),
-          updated_at  = NOW()
-        WHERE id = ${id}
-        RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
-                  telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
-      `;
-      if (nuevoTecnicoId && nuevoTecnicoId !== beneficiarioActual.tecnico_id) {
-        await reserved`
-          UPDATE asignaciones_beneficiario
-          SET activo = false, removido_en = NOW()
-          WHERE beneficiario_id = ${id} AND activo = true
-        `;
-        await reserved`
-          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-          VALUES (${nuevoTecnicoId}, ${id}, ${user.sub})
-        `;
-      }
-      await reserved`COMMIT`;
-      actualizado = row;
-    } catch (err) {
-      await reserved`ROLLBACK`;
-      throw err;
-    } finally {
-      reserved.release();
-    }
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
+      const coordParcela = normalizePoint(body.coord_parcela);
 
-    return c.json(actualizado);
+      const beneficiarioActual = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiarioActual) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      if (body.coord_parcela && !coordParcela) {
+        return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+      }
+
+      if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
+        return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
+      }
+
+      if (body.tecnico_id) {
+        const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
+        if (!tecnicoValido) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
+        if (user.rol === "coordinador") {
+          const tieneAcceso = await existsTecnicoActivoWithCoordinador(body.tecnico_id, user.sub);
+          if (!tieneAcceso) return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+        }
+      }
+
+      const nuevoTecnicoId = body.tecnico_id;
+      let actualizado;
+      
+      if (nuevoTecnicoId && nuevoTecnicoId !== beneficiarioActual.tecnico_id) {
+        actualizado = await updateBeneficiarioWithAsignacion(
+          id,
+          beneficiarioActual.tecnico_id,
+          nuevoTecnicoId,
+          user.sub,
+          { ...body, coordParcela: coordParcela }
+        );
+      } else {
+        actualizado = await updateBeneficiario(id, { ...body, coordParcela: coordParcela });
+      }
+      
+      if (!actualizado) return c.json({ error: "Error al actualizar beneficiario" }, 500);
+      return c.json(actualizado);
+    } catch (e) {
+      console.error("[Beneficiarios] Error al actualizar:", e);
+      return c.json({ error: "Error al actualizar beneficiario" }, 500);
+    }
   }
 );
 
@@ -270,45 +204,20 @@ app.delete(
   "/:id",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const user = c.get("user");
-  const { id } = c.req.valid("param");
+    try {
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
 
-  const [beneficiario] =
-    user.rol === "admin"
-      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
-      : await sql`
-          SELECT b.id
-          FROM beneficiarios b
-          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
-        `;
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
-  if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
-
-  const reserved = await sql.reserve();
-  try {
-    await reserved`BEGIN`;
-    await reserved`
-      UPDATE beneficiarios
-      SET activo = false, updated_at = NOW()
-      WHERE id = ${id} AND activo = true
-    `;
-
-    await reserved`
-      UPDATE asignaciones_beneficiario
-      SET activo = false, removido_en = NOW()
-      WHERE beneficiario_id = ${id} AND activo = true
-    `;
-    await reserved`COMMIT`;
-  } catch (err) {
-    await reserved`ROLLBACK`;
-    throw err;
-  } finally {
-    reserved.release();
+      await deactivateBeneficiario(id);
+      return c.json({ message: "Beneficiario desactivado" });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al desactivar:", e);
+      return c.json({ error: "Error al desactivar beneficiario" }, 500);
+    }
   }
-
-  return c.json({ message: "Beneficiario desactivado" });
-}
 );
 
 app.post(
@@ -317,42 +226,26 @@ app.post(
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ cadena_ids: z.array(z.string().uuid()) })),
   async (c) => {
-    const user = c.get("user");
-    const { id } = c.req.valid("param");
-    const { cadena_ids } = c.req.valid("json");
+    try {
+      const { id } = c.req.valid("param");
+      const { cadena_ids } = c.req.valid("json");
 
-    const [beneficiario] =
-      user.rol === "admin"
-        ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
-        : await sql`
-            SELECT b.id
-            FROM beneficiarios b
-            JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
-          `;
-    if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+      const beneficiario = await findBeneficiarioById(id);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
-    if (cadena_ids.length > 0) {
-      const validas = await sql`
-        SELECT id
-        FROM cadenas_productivas
-        WHERE id = ANY(${cadena_ids}::uuid[]) AND activo = true
-      `;
-      if (validas.length !== cadena_ids.length) {
-        return c.json({ error: "Una o más cadenas no existen o están inactivas" }, 400);
+      if (cadena_ids.length > 0) {
+        const validas = await existsCadenasActivasByIds(cadena_ids);
+        if (!validas) {
+          return c.json({ error: "Una o más cadenas no existen o están inactivas" }, 400);
+        }
       }
-    }
 
-    await sql`UPDATE beneficiario_cadenas SET activo = false WHERE beneficiario_id = ${id}`;
-    if (cadena_ids.length > 0) {
-      await sql`
-        INSERT INTO beneficiario_cadenas (beneficiario_id, cadena_id, activo, asignado_en)
-        SELECT ${id}, unnest(${cadena_ids}::uuid[]), true, NOW()
-        ON CONFLICT (beneficiario_id, cadena_id)
-        DO UPDATE SET activo = true, asignado_en = NOW()
-      `;
+      await updateBeneficiarioCadenas(id, cadena_ids);
+      return c.json({ message: "Cadenas actualizadas" });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al actualizar cadenas:", e);
+      return c.json({ error: "Error al actualizar cadenas" }, 500);
     }
-    return c.json({ message: "Cadenas actualizadas" });
   }
 );
 
@@ -360,63 +253,58 @@ app.post(
   "/:id/documentos",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
 
-  const [beneficiario] =
-    user.rol === "admin"
-      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
-      : await sql`
-          SELECT b.id
-          FROM beneficiarios b
-          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
-        `;
-  if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
-  const formData = await c.req.formData();
-  const archivo = formData.get("archivo") as File | null;
-  const tipo = formData.get("tipo") as string | null;
+      const formData = await c.req.formData();
+      const archivo = formData.get("archivo") as File | null;
+      const tipo = formData.get("tipo") as string | null;
 
-  if (!archivo || !tipo) return c.json({ error: "Archivo y tipo son requeridos" }, 400);
+      if (!archivo || !tipo) return c.json({ error: "Archivo y tipo son requeridos" }, 400);
 
-  const sha256 = createHash("sha256").update(Buffer.from(await archivo.arrayBuffer())).digest("hex");
-  const result = await uploadBeneficiarioDocumentos(id, [archivo]);
-  const { url: secure_url } = result.documentos[0];
+      const sha256 = createHash("sha256").update(Buffer.from(await archivo.arrayBuffer())).digest("hex");
+      const result = await uploadBeneficiarioDocumentos(id, [archivo]);
+      const { url: secure_url } = result.documentos[0];
 
-  const [doc] = await sql`
-    INSERT INTO documentos (beneficiario_id, tipo, nombre_original, r2_key, sha256, bytes, subido_por)
-    VALUES (${id}, ${tipo}, ${archivo.name}, ${secure_url}, ${sha256}, ${archivo.size}, ${user.sub})
-    RETURNING id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
-  `;
-  return c.json(doc, 201);
-}
+      const doc = await createDocumento({
+        beneficiario_id: id,
+        tipo,
+        nombre_original: archivo.name,
+        r2_key: secure_url,
+        sha256,
+        bytes: archivo.size,
+        subido_por: user.sub,
+      });
+      return c.json(doc, 201);
+    } catch (e) {
+      console.error("[Beneficiarios] Error al subir documento:", e);
+      return c.json({ error: "Error al subir documento" }, 500);
+    }
+  }
 );
 
 app.get(
   "/:id/documentos",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const { id } = c.req.valid("param");
-  const user = c.get("user");
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
 
-  const [beneficiario] =
-    user.rol === "admin"
-      ? await sql`SELECT id FROM beneficiarios WHERE id = ${id} AND activo = true`
-      : await sql`
-          SELECT b.id
-          FROM beneficiarios b
-          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${user.sub} AND b.activo = true
-        `;
-  if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
 
-  const docs = await sql`
-    SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
-    FROM documentos WHERE beneficiario_id = ${id}
-  `;
-  return c.json(docs);
-}
+      const docs = await listDocumentosByBeneficiarioId(id);
+      return c.json(docs);
+    } catch (e) {
+      console.error("[Beneficiarios] Error al listar documentos:", e);
+      return c.json({ error: "Error al obtener documentos" }, 500);
+    }
+  }
 );
 
 export default app;

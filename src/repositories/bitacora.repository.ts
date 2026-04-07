@@ -22,8 +22,7 @@ export async function findBitacoraByIdWithAccess(
       ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
       : await sql`
           SELECT b.* FROM bitacoras b
-          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
           WHERE b.id = ${id} AND td.coordinador_id = ${userId}
         `;
   return (row ?? null) as unknown as Bitacora | null;
@@ -72,8 +71,8 @@ export async function findAllBitacoras(
             cp.nombre AS cadena_nombre,
             a.nombre AS actividad_nombre
      FROM bitacoras b
-     JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-     LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+     LEFT JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
+     LEFT JOIN usuarios t ON t.id = b.tecnico_id
      LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
      LEFT JOIN cadenas_productivas cp ON cp.id = b.cadena_productiva_id
      LEFT JOIN actividades a ON a.id = b.actividad_id
@@ -127,8 +126,7 @@ export async function existsBitacoraByIdWithAccess(
       ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
       : await sql`
           SELECT b.id FROM bitacoras b
-          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
+          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
           WHERE b.id = ${id} AND td.coordinador_id = ${userId}
         `;
   return Boolean(row);

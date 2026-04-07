@@ -7,16 +7,20 @@ export async function rateLimit(
   max = 20,
   windowSecs = 60
 ) {
-  const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? c.req.header("x-real-ip") ?? "unknown";
-  const route = new URL(c.req.url).pathname;
-  const key = `rl:${ip}:${route}`;
+  try {
+    const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? c.req.header("x-real-ip") ?? "unknown";
+    const route = new URL(c.req.url).pathname;
+    const key = `rl:${ip}:${route}`;
 
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, windowSecs);
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, windowSecs);
 
-  if (count > max) {
-    console.warn(`[RateLimit] IP: ${ip} excedió límite en ${route}`);
-    return c.json({ error: "Demasiadas solicitudes, intenta más tarde" }, 429);
+    if (count > max) {
+      console.warn(`[RateLimit] IP: ${ip} excedió límite en ${route}`);
+      return c.json({ error: "Demasiadas solicitudes, intenta más tarde" }, 429);
+    }
+  } catch (e) {
+    console.warn("[RateLimit] Redis no disponible, saltando limitación");
   }
   return next();
 }

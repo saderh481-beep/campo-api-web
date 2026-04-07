@@ -23,6 +23,11 @@ export async function listLocalidades() {
   `;
 }
 
+export async function existsLocalidadActiva(localidadId: string) {
+  const [localidad] = await sql`SELECT id FROM localidades WHERE id = ${localidadId} AND activo = true`;
+  return Boolean(localidad);
+}
+
 export async function existsZonaActiva(zonaId: string) {
   const [zona] = await sql`SELECT id FROM zonas WHERE id = ${zonaId} AND activo = true`;
   return Boolean(zona);

@@ -4,6 +4,51 @@ Base URL: `https://tu-api.com/api/v1`
 
 Todos los endpoints requieren autenticación Bearer Token excepto los de autenticación.
 
+## Arquitectura
+
+La API sigue los principios SOLID con la siguiente estructura:
+
+### Modelos (`src/models/`)
+Capa de acceso a datos con consultas SQL parametrizadas:
+
+| Modelo | Descripción |
+|--------|-------------|
+| `usuarios.model.ts` | Gestión de usuarios |
+| `tecnicos.model.ts` | Gestión de técnicos |
+| `tecnico-detalles.model.ts` | Detalles técnicos y asignaciones |
+| `beneficiarios.model.ts` | Beneficiarios con transacciones |
+| `beneficiario_cadenas.model.ts` | Cadenas por beneficiario |
+| `documentos.model.ts` | Documentos de beneficiarios |
+| `documentos_pdf.model.ts` | PDFs descargables |
+| `bitacoras.model.ts` | Bitácoras |
+| `cadenas.model.ts` | Cadenas productivas |
+| `actividades.model.ts` | Actividades |
+| `localidades.model.ts` | Localidades |
+| `zonas.model.ts` | Zonas |
+| `asignaciones.model.ts` | Asignaciones (coordinador-técnico, beneficiario, actividad) |
+| `configuraciones.model.ts` | Configuraciones del sistema |
+| `notificaciones.model.ts` | Notificaciones |
+| `auth_logs.model.ts` | Logs de autenticación |
+| `reportes.model.ts` | Reportes |
+| `dashboard.model.ts` | Estadísticas |
+| `archive.model.ts` | Archivos |
+
+### Repositorios (`src/repositories/`)
+Lógica de negocio para operaciones complejas:
+
+- `bitacora.repository.ts` - Bitácoras con filtros y control de acceso
+
+### Características de la base de datos
+
+- **Consultas parametrizadas**: Previenen inyección SQL
+- **Transacciones**: Para operaciones multi-tabla (beneficiarios, asignaciones)
+- **Validación de relaciones**: Verificación de IDs antes de crear/actualizar
+- **Soft deletes**: Campos `activo` para eliminación lógica
+- **Índices**: Utiliza índices existentes para optimizar consultas
+- **Control de acceso**: Verificación de coordinador_id para coordinadores
+
+---
+
 ## Autenticación
 
 ### POST /auth/verify-codigo-acceso
@@ -896,6 +941,35 @@ Actualizar bitácora.
   "id": "uuid",
   "observaciones_coordinador": "Observaciones del coordinador",
   "actividades_desc": "Actividades realizadas actualizadas",
+  "updated_at": "2026-04-06T12:00:00Z"
+}
+```
+
+---
+
+### PATCH /bitacoras/:id/pdf-config
+Actualizar configuración de PDF de bitácora.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "pdf_edicion": {
+    "encabezado": "Nuevo encabezado",
+    "pie": "Nuevo pie"
+  }
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "pdf_edicion": {
+    "encabezado": "Nuevo encabezado",
+    "pie": "Nuevo pie"
+  },
   "updated_at": "2026-04-06T12:00:00Z"
 }
 ```

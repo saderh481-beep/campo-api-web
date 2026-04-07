@@ -41,10 +41,18 @@ export async function updateCadena(id: string, input: CadenaUpdateInput) {
 }
 
 export async function deactivateCadena(id: string) {
-  const [row] = await sql`
+  const [cadena] = await sql`
     UPDATE cadenas_productivas SET activo = false, updated_at = NOW()
     WHERE id = ${id} AND activo = true
     RETURNING id
   `;
-  return row ?? null;
+  return cadena ?? null;
+}
+
+export async function existsCadenasActivasByIds(cadenaIds: string[]) {
+  if (cadenaIds.length === 0) return true;
+  const result = await sql`
+    SELECT id FROM cadenas_productivas WHERE id = ANY(${cadenaIds}::uuid[]) AND activo = true
+  `;
+  return result.length === cadenaIds.length;
 }

@@ -11,8 +11,13 @@ const app = new Hono<AppEnv>();
 app.use("*", authMiddleware, requireRole("admin"));
 
 app.get("/", async (c) => {
-  const rows = await listUsuarios();
-  return c.json(rows);
+  try {
+    const rows = await listUsuarios();
+    return c.json(rows);
+  } catch (e) {
+    console.error("[Usuarios] Error al listar usuarios:", e);
+    return c.json({ error: "Error al obtener usuarios" }, 500);
+  }
 });
 
 app.post(
@@ -26,15 +31,21 @@ app.post(
     })
   ),
   async (c) => {
-    const body = c.req.valid("json");
-    if (await existsUsuarioByCorreo(body.correo)) {
-      return c.json({ error: "El correo ya está registrado" }, 409);
+    try {
+      const body = c.req.valid("json");
+      if (await existsUsuarioByCorreo(body.correo)) {
+        return c.json({ error: "El correo ya está registrado" }, 409);
+      }
+      const codigo = randomInt(10000, 100000).toString();
+      const hashCodigo = await hash(codigo, 12);
+      const input = { ...body, codigo, hash_codigo_acceso: hashCodigo } as unknown;
+      const row = await createUsuario(input as Parameters<typeof createUsuario>[0]);
+      if (!row) return c.json({ error: "Error al crear usuario" }, 500);
+      return c.json({ ...row, codigo }, 201);
+    } catch (e) {
+      console.error("[Usuarios] Error al crear usuario:", e);
+      return c.json({ error: "Error al crear usuario" }, 500);
     }
-    const codigo = randomInt(10000, 100000).toString();
-    const hashCodigo = await hash(codigo, 12);
-    const input = { ...body, codigo, hash_codigo_acceso: hashCodigo } as unknown;
-    const row = await createUsuario(input as Parameters<typeof createUsuario>[0]);
-    return c.json({ ...row, codigo }, 201);
   }
 );
 
@@ -52,18 +63,23 @@ app.patch(
     })
   ),
   async (c) => {
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    if (body.correo && await existsUsuarioByCorreo(body.correo, id)) {
-      return c.json({ error: "El correo ya está registrado" }, 409);
+    try {
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      if (body.correo && await existsUsuarioByCorreo(body.correo, id)) {
+        return c.json({ error: "El correo ya está registrado" }, 409);
+      }
+      const updateInput: UsuarioUpdateInput & { hash_codigo_acceso?: string | null } = { ...body };
+      if (body.codigo_acceso) {
+        updateInput.hash_codigo_acceso = await hash(body.codigo_acceso, 12);
+      }
+      const row = await updateUsuario(id, updateInput);
+      if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
+      return c.json(row);
+    } catch (e) {
+      console.error("[Usuarios] Error al actualizar usuario:", e);
+      return c.json({ error: "Error al actualizar usuario" }, 500);
     }
-    const updateInput: UsuarioUpdateInput & { hash_codigo_acceso?: string | null } = { ...body };
-    if (body.codigo_acceso) {
-      updateInput.hash_codigo_acceso = await hash(body.codigo_acceso, 12);
-    }
-    const row = await updateUsuario(id, updateInput);
-    if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
-    return c.json(row);
   }
 );
 
@@ -71,10 +87,15 @@ app.delete(
   "/:id",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-    const { id } = c.req.param();
-    const row = await deactivateUsuario(id);
-    if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
-    return c.json({ message: "Usuario desactivado" });
+    try {
+      const { id } = c.req.param();
+      const row = await deactivateUsuario(id);
+      if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
+      return c.json({ message: "Usuario desactivado" });
+    } catch (e) {
+      console.error("[Usuarios] Error al desactivar usuario:", e);
+      return c.json({ error: "Error al desactivar usuario" }, 500);
+    }
   }
 );
 
@@ -82,10 +103,15 @@ app.delete(
   "/:id/force",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-    const { id } = c.req.param();
-    const row = await deleteUsuarioFisico(id);
-    if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
-    return c.json({ message: "Usuario eliminado" });
+    try {
+      const { id } = c.req.param();
+      const row = await deleteUsuarioFisico(id);
+      if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
+      return c.json({ message: "Usuario eliminado" });
+    } catch (e) {
+      console.error("[Usuarios] Error al eliminar usuario:", e);
+      return c.json({ error: "Error al eliminar usuario" }, 500);
+    }
   }
 );
 

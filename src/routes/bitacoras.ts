@@ -8,6 +8,19 @@ import { authMiddleware, requireRole } from "@/middleware/auth";
 import { generarPdfBitacora } from "@/lib/pdf";
 import type { PdfConfig } from "@/lib/pdf";
 import type { JwtPayload } from "@/lib/jwt";
+import type { BitacoraFiltros } from "@/domain/entities/bitacora.entity";
+import {
+  findBitacoraById,
+  findBitacoraByIdWithAccess,
+  findAllBitacoras,
+  updateBitacora,
+  updateBitacoraPdfConfig,
+  existsBitacoraByIdWithAccess,
+  findPdfVersionesByBitacoraId,
+  getNextPdfVersion,
+  createPdfVersion,
+  getPdfConfig,
+} from "@/repositories/bitacora.repository";
 
 const app = new Hono<{
   Variables: {
@@ -30,42 +43,8 @@ app.get(
   ),
   async (c) => {
     const user = c.get("user");
-    const { tecnico_id, mes, anio, estado, tipo } = c.req.valid("query");
-
-    const condiciones: string[] = [];
-    const params: Array<string | number> = [];
-    let i = 1;
-
-    if (user.rol === "coordinador") {
-      condiciones.push(`td.coordinador_id = $${i++}`);
-      params.push(user.sub);
-    }
-    if (tecnico_id) { condiciones.push(`b.tecnico_id = $${i++}`); params.push(tecnico_id); }
-    if (mes) { condiciones.push(`EXTRACT(MONTH FROM b.fecha_inicio) = $${i++}`); params.push(mes); }
-    if (anio) { condiciones.push(`EXTRACT(YEAR FROM b.fecha_inicio) = $${i++}`); params.push(anio); }
-    if (estado) { condiciones.push(`b.estado = $${i++}`); params.push(estado); }
-    if (tipo) { condiciones.push(`b.tipo = $${i++}`); params.push(tipo); }
-
-    const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
-
-    const bitacoras = await sql.unsafe(
-      `SELECT b.id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin,
-              t.nombre AS tecnico_nombre,
-              be.nombre AS beneficiario_nombre,
-              cp.nombre AS cadena_nombre,
-              a.nombre AS actividad_nombre
-       FROM bitacoras b
-       JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-       LEFT JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-       LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
-       LEFT JOIN cadenas_productivas cp ON cp.id = b.cadena_productiva_id
-       LEFT JOIN actividades a ON a.id = b.actividad_id
-       LEFT JOIN usuarios u ON u.id = td.coordinador_id
-       ${where}
-       ORDER BY b.fecha_inicio DESC
-       LIMIT 100`,
-      params
-    );
+    const filtros = c.req.valid("query") as BitacoraFiltros;
+    const bitacoras = await findAllBitacoras(filtros, user.sub, user.rol);
     return c.json(bitacoras);
   }
 );
@@ -74,20 +53,12 @@ app.get(
   "/:id",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const user = c.get("user");
-  const { id } = c.req.param();
-    const [bitacora] =
-      user.rol === "admin"
-        ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
-        : await sql`
-            SELECT b.* FROM bitacoras b
-            JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-            JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
-          `;
-  if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
-  return c.json(bitacora);
-}
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+    return c.json(bitacora);
+  }
 );
 
 app.patch(
@@ -102,28 +73,16 @@ app.patch(
   ),
   async (c) => {
     const user = c.get("user");
-    const { id } = c.req.param();
+    const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const [pertenece] =
-      user.rol === "admin"
-        ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
-        : await sql`
-            SELECT b.id FROM bitacoras b
-            JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-            JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
-          `;
-    if (!pertenece) return c.json({ error: "Bitácora no encontrada" }, 404);
+    const tieneAcceso = await existsBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!tieneAcceso) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    const [actualizada] = await sql`
-      UPDATE bitacoras SET
-        observaciones_coordinador = COALESCE(${body.observaciones ?? null}, observaciones_coordinador),
-        actividades_desc          = COALESCE(${body.actividades_realizadas ?? null}, actividades_desc),
-        updated_at                = NOW()
-      WHERE id = ${id}
-      RETURNING id, tipo, estado, observaciones_coordinador, actividades_desc, updated_at
-    `;
+    const actualizada = await updateBitacora(id, {
+      observaciones: body.observaciones,
+      actividades_realizadas: body.actividades_realizadas,
+    });
     return c.json(actualizada);
   }
 );
@@ -134,144 +93,104 @@ app.patch(
   zValidator("json", z.object({ pdf_edicion: z.record(z.string(), z.unknown()) })),
   async (c) => {
     const user = c.get("user");
-    const { id } = c.req.param();
+    const { id } = c.req.valid("param");
     const { pdf_edicion } = c.req.valid("json");
 
-    const [pertenece] =
-      user.rol === "admin"
-        ? await sql`SELECT id FROM bitacoras WHERE id = ${id}`
-        : await sql`
-            SELECT b.id FROM bitacoras b
-            JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-            JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-            WHERE b.id = ${id} AND td.coordinador_id = ${user.sub}
-          `;
-    if (!pertenece) return c.json({ error: "Bitácora no encontrada" }, 404);
+    const tieneAcceso = await existsBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!tieneAcceso) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    const [actualizada] = await sql`
-      UPDATE bitacoras
-      SET pdf_edicion = ${JSON.stringify(pdf_edicion)}::jsonb,
-          updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING id, pdf_edicion, updated_at
-    `;
-
+    const actualizada = await updateBitacoraPdfConfig(id, pdf_edicion);
     return c.json(actualizada);
   }
 );
-
-async function obtenerBitacoraConAcceso(id: string, userId: string, rol: string) {
-  return rol === "admin"
-    ? (await sql`SELECT * FROM bitacoras WHERE id = ${id}`)[0]
-    : (
-        await sql`
-          SELECT b.* FROM bitacoras b
-          JOIN usuarios t ON t.id = b.tecnico_id AND t.rol = 'tecnico' AND t.activo = true
-          JOIN tecnico_detalles td ON td.tecnico_id = t.id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${userId}
-        `
-      )[0];
-}
-
-async function cargarPdfConfig(): Promise<PdfConfig> {
-  const [row] = await sql`
-    SELECT valor FROM configuraciones WHERE clave = 'pdf_encabezado'
-  `;
-  return (row?.valor ?? {}) as PdfConfig;
-}
 
 app.get(
   "/:id/pdf",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const user = c.get("user");
-  const { id } = c.req.param();
-  const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
-  if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const pdfConfig = await cargarPdfConfig();
-  const pdfBytes = await generarPdfBitacora(bitacora, {}, pdfConfig);
-  return new Response(Buffer.from(pdfBytes), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="bitacora-${id}.pdf"`,
-    },
-  });
-}
+    const pdfConfig = await getPdfConfig();
+    const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
+    return new Response(Buffer.from(pdfBytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="bitacora-${id}.pdf"`,
+      },
+    });
+  }
 );
 
 app.get(
   "/:id/pdf/descargar",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const user = c.get("user");
-  const { id } = c.req.param();
-  const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
-  if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const pdfConfig = await cargarPdfConfig();
-  const pdfBytes = await generarPdfBitacora(bitacora, {}, pdfConfig);
-  return new Response(Buffer.from(pdfBytes), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="bitacora-${id}.pdf"`,
-    },
-  });
-}
+    const pdfConfig = await getPdfConfig();
+    const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
+    return new Response(Buffer.from(pdfBytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="bitacora-${id}.pdf"`,
+      },
+    });
+  }
 );
 
 app.post(
   "/:id/pdf/imprimir",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const user = c.get("user");
-  const { id } = c.req.param();
-  const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
-  if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const pdfConfig = await cargarPdfConfig();
-  const pdfBytes = await generarPdfBitacora(bitacora, { impresion: true }, pdfConfig);
+    const pdfConfig = await getPdfConfig();
+    const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, { impresion: true }, pdfConfig as PdfConfig);
 
-  const buffer = Buffer.from(pdfBytes);
-  const sha256 = createHash("sha256").update(buffer).digest("hex");
+    const buffer = Buffer.from(pdfBytes);
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
 
-  const [{ next_version }] = await sql`
-    SELECT COALESCE(MAX(version), 0) + 1 AS next_version
-    FROM pdf_versiones
-    WHERE bitacora_id = ${id}
-  `;
+    const nextVersion = await getNextPdfVersion(id);
 
-  const publicId = `bitacoras/${bitacora.tecnico_id}/${new Date().getMonth() + 1}/bitacora-${id}-impresion-${Date.now()}`;
-  const upload = await subirPDF(publicId, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
+    const publicId = `bitacoras/${bitacora.tecnico_id}/${new Date().getMonth() + 1}/bitacora-${id}-impresion-${Date.now()}`;
+    const upload = await subirPDF(publicId, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
 
-  await sql`
-    INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
-    VALUES (${id}, ${next_version}, ${upload.url}, ${sha256}, false, ${user.sub})
-  `;
+    await createPdfVersion({
+      bitacoraId: id,
+      version: nextVersion,
+      r2Key: upload.url,
+      sha256,
+      inmutable: false,
+      generadoPor: user.sub,
+    });
 
-  return new Response(Buffer.from(pdfBytes), {
-    headers: { "Content-Type": "application/pdf" },
-  });
-}
+    return new Response(Buffer.from(pdfBytes), {
+      headers: { "Content-Type": "application/pdf" },
+    });
+  }
 );
 
 app.get(
   "/:id/versiones",
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-  const { id } = c.req.param();
-  const user = c.get("user");
-  const bitacora = await obtenerBitacoraConAcceso(id, user.sub, user.rol);
-  if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+    const { id } = c.req.valid("param");
+    const user = c.get("user");
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-  const versiones = await sql`
-    SELECT id, version, r2_key, sha256, inmutable, generado_por, created_at
-    FROM pdf_versiones
-    WHERE bitacora_id = ${id}
-    ORDER BY version DESC
-  `;
-  return c.json(versiones);
-}
+    const versiones = await findPdfVersionesByBitacoraId(id);
+    return c.json(versiones);
+  }
 );
 
 export default app;

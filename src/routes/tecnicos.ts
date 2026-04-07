@@ -11,9 +11,14 @@ const app = new Hono<AppEnv>();
 app.use("*", authMiddleware);
 
 app.get("/", requireRole("admin", "coordinador"), async (c) => {
-  const user = c.get("user");
-  const rows = await listTecnicosByRole(user.sub, user.rol);
-  return c.json(rows);
+  try {
+    const user = c.get("user");
+    const rows = await listTecnicosByRole(user.sub, user.rol);
+    return c.json(rows);
+  } catch (e) {
+    console.error("[Tecnicos] Error al listar técnicos:", e);
+    return c.json({ error: "Error al obtener técnicos" }, 500);
+  }
 });
 
 app.get(
@@ -21,15 +26,20 @@ app.get(
   requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-    const { id } = c.req.param();
-    const user = c.get("user");
-    const tecnico = await findTecnicoById(id);
-    if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
-    if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
-      return c.json({ error: "Sin permisos" }, 403);
+    try {
+      const { id } = c.req.param();
+      const user = c.get("user");
+      const tecnico = await findTecnicoById(id);
+      if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
+      if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+        return c.json({ error: "Sin permisos" }, 403);
+      }
+      const asignaciones = await listAsignacionesByTecnicoId(id);
+      return c.json({ ...tecnico, asignaciones });
+    } catch (e) {
+      console.error("[Tecnicos] Error al obtener técnico:", e);
+      return c.json({ error: "Error al obtener técnico" }, 500);
     }
-    const asignaciones = await listAsignacionesByTecnicoId(id);
-    return c.json({ ...tecnico, asignaciones });
   }
 );
 
@@ -66,17 +76,22 @@ app.patch(
     })
   ),
   async (c) => {
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    if (body.correo && await existsCorreoEnUsuarioActivo(body.correo)) {
-      return c.json({ error: "El correo ya está registrado" }, 409);
+    try {
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      if (body.correo && await existsCorreoEnUsuarioActivo(body.correo)) {
+        return c.json({ error: "El correo ya está registrado" }, 409);
+      }
+      if (body.coordinador_id && !(await isCoordinadorActivo(body.coordinador_id))) {
+        return c.json({ error: "Coordinador inválido o inactivo" }, 400);
+      }
+      const result = await updateTecnico(id, body as TecnicoUpdateInput);
+      if (!result) return c.json({ error: "Técnico no encontrado" }, 404);
+      return c.json(result);
+    } catch (e) {
+      console.error("[Tecnicos] Error al actualizar técnico:", e);
+      return c.json({ error: "Error al actualizar técnico" }, 500);
     }
-    if (body.coordinador_id && !(await isCoordinadorActivo(body.coordinador_id))) {
-      return c.json({ error: "Coordinador inválido o inactivo" }, 400);
-    }
-    const result = await updateTecnico(id, body as TecnicoUpdateInput);
-    if (!result) return c.json({ error: "Técnico no encontrado" }, 404);
-    return c.json(result);
   }
 );
 
@@ -85,19 +100,29 @@ app.post(
   requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-    const { id } = c.req.param();
-    const tecnico = await findTecnicoById(id);
-    if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
-    const codigo = randomInt(10000, 100000).toString();
-    const hashCodigo = await hash(codigo, 12);
-    await updateTecnicoCodigo(id, codigo, hashCodigo);
-    return c.json({ message: "Código regenerado", codigo });
+    try {
+      const { id } = c.req.param();
+      const tecnico = await findTecnicoById(id);
+      if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
+      const codigo = randomInt(10000, 100000).toString();
+      const hashCodigo = await hash(codigo, 12);
+      await updateTecnicoCodigo(id, codigo, hashCodigo);
+      return c.json({ message: "Código regenerado", codigo });
+    } catch (e) {
+      console.error("[Tecnicos] Error al regenerar código:", e);
+      return c.json({ error: "Error al regenerar código" }, 500);
+    }
   }
 );
 
 app.post("/aplicar-cortes", requireRole("admin"), async (c) => {
-  const tecnicos = await applyCortesVencidos();
-  return c.json({ message: `Corte aplicado a ${tecnicos.length} técnico(s)`, tecnicos });
+  try {
+    const tecnicos = await applyCortesVencidos();
+    return c.json({ message: `Corte aplicado a ${tecnicos.length} técnico(s)`, tecnicos });
+  } catch (e) {
+    console.error("[Tecnicos] Error al aplicar cortes:", e);
+    return c.json({ error: "Error al aplicar cortes" }, 500);
+  }
 });
 
 app.post(
@@ -105,16 +130,21 @@ app.post(
   requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-    const { id } = c.req.param();
-    const user = c.get("user");
-    const tecnico = await findTecnicoById(id);
-    if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
-    if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
-      return c.json({ error: "Sin permisos sobre este técnico" }, 403);
+    try {
+      const { id } = c.req.param();
+      const user = c.get("user");
+      const tecnico = await findTecnicoById(id);
+      if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
+      if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+        return c.json({ error: "Sin permisos sobre este técnico" }, 403);
+      }
+      const result = await cerrarCorteById(id);
+      if (!result) return c.json({ error: "Asignación de corte no encontrada" }, 404);
+      return c.json({ message: "Período cerrado", tecnico: result });
+    } catch (e) {
+      console.error("[Tecnicos] Error al cerrar corte:", e);
+      return c.json({ error: "Error al cerrar corte" }, 500);
     }
-    const result = await cerrarCorteById(id);
-    if (!result) return c.json({ error: "Asignación de corte no encontrada" }, 404);
-    return c.json({ message: "Período cerrado", tecnico: result });
   }
 );
 
@@ -123,10 +153,15 @@ app.delete(
   requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
-    const { id } = c.req.param();
-    const result = await deactivateTecnico(id);
-    if (!result) return c.json({ error: "Técnico no encontrado" }, 404);
-    return c.json({ message: "Técnico desactivado" });
+    try {
+      const { id } = c.req.param();
+      const result = await deactivateTecnico(id);
+      if (!result) return c.json({ error: "Técnico no encontrado" }, 404);
+      return c.json({ message: "Técnico desactivado" });
+    } catch (e) {
+      console.error("[Tecnicos] Error al desactivar técnico:", e);
+      return c.json({ error: "Error al desactivar técnico" }, 500);
+    }
   }
 );
 
