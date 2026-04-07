@@ -12,7 +12,8 @@
     "migrate": "bun run migrate.ts",
     "schema": "bun run schema.ts",
     "seed:usuarios": "bun run create-users.ts",
-    "seed:admin": "bun run create-admin.ts"
+    "seed:admin": "bun run create-admin.ts",
+    "reset-data": "bun run reset-data.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",
