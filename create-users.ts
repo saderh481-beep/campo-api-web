@@ -54,6 +54,7 @@ async function main() {
 
     const upserted: Array<{ correo: string; rol: string; codigo: string; id: string }> = [];
 
+    // 1. Crear usuarios
     for (const user of seedUsers) {
       const hashedCodigo = hashSHA512(user.codigo);
       const [row] = await sql`
@@ -72,11 +73,41 @@ async function main() {
       console.log(`OK ${row.rol}: ${row.correo}`);
     }
 
-    console.log("Nota: este script solo crea usuarios base. La asignacion coordinador-tecnico y fecha limite se gestionan en el flujo de asignaciones.");
+    // 2. Obtener IDs
+    const admin = upserted.find(u => u.rol === "admin");
+    const coordinator = upserted.find(u => u.rol === "coordinador");
+    const tecnicos = upserted.filter(u => u.rol === "tecnico");
+
+    if (!admin || !coordinator) {
+      throw new Error("No se encontraron admin o coordinador");
+    }
+
+    // 3. Crear tecnico_detalles para cada técnico y asignar al coordinador
+    for (const tecnico of tecnicos) {
+      const fechaLimite = new Date();
+      fechaLimite.setFullYear(fechaLimite.getFullYear() + 1);
+
+      await sql`
+        INSERT INTO tecnico_detalles (tecnico_id, coordinador_id, fecha_limite, estado_corte, activo)
+        VALUES (${tecnico.id}, ${coordinator.id}, ${fechaLimite.toISOString()}, 'en_servicio', true)
+        ON CONFLICT (tecnico_id)
+        DO UPDATE SET
+          coordinador_id = EXCLUDED.coordinador_id,
+          fecha_limite = EXCLUDED.fecha_limite,
+          estado_corte = 'en_servicio',
+          activo = true
+      `;
+      console.log(`OK tecnico_detalles: ${tecnico.correo} -> coordinador ${coordinator.correo}`);
+    }
 
     console.log("\nUsuarios base listos:");
     for (const row of upserted) {
       console.log(`- ${row.rol}: ${row.correo} -> ${row.codigo}`);
+    }
+
+    console.log("\nAsignaciones coordinador-técnico creadas:");
+    for (const t of tecnicos) {
+      console.log(`- ${t.correo} -> coordinador ${coordinator.correo}`);
     }
 
     process.exit(0);
