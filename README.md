@@ -34,24 +34,48 @@ Nota: Redis se usa para sesiones web. Los codigos de acceso de usuarios/tecnicos
 ## Roles
 
 Roles usados por el backend:
-- administrador
-- coordinador
-- tecnico
+- `admin`
+- `coordinador`
+- `tecnico`
 
 ## Estado de corte (tecnicos)
 
-Nota: La informacion de tecnicos ahora vive en `usuarios` con `rol = 'tecnico'`.
+La información de tecnicos ahora vive en `usuarios` con `rol = 'tecnico'`.
 
-Los tecnicos tienen un campo `estado_corte` con tres valores posibles:
-- `en_servicio` — activo, puede iniciar sesion.
-- `corte_aplicado` — periodo vencido, bloqueado en login y en cada request.
+Los tecnicos tienen un campo `estado_corte` en `tecnico_detalles` con cuatro valores posibles:
+- `activo` — activo, puede iniciar sesion.
+- `en_servicio` — en periodo de servicio, puede iniciar sesion.
+- `suspendido` — periodo vencido, bloqueado en login y en cada request.
 - `baja` — dado de baja definitiva.
 
 Logica de bloqueo:
 - El corte se determina con `configuraciones.fecha_corte_global.valor.fecha` (no por `fecha_limite` individual).
 - En cada request: el middleware valida la fecha de corte global cargada en sesion.
-- En login: si la fecha de corte global ya vencio, se actualiza `estado_corte = corte_aplicado` y se rechaza con `401 { error: "periodo_vencido" }`.
+- En login: si la fecha de corte global ya vencio, se actualiza `estado_corte = suspended` y se rechaza con `401 { error: "periodo_vencido" }`.
 - Si no existe fecha de corte global configurada, login de tecnicos responde `401 { error: "periodo_no_configurado" }`.
+
+## Esquema de datos
+
+### Tabla usuarios
+- `id` (uuid, PK)
+- `correo` (varchar, unique)
+- `nombre` (varchar)
+- `rol` (varchar) — valores: `admin`, `coordinador`, `tecnico`
+- `codigo_acceso` (varchar)
+- `hash_codigo_acceso` (char)
+- `activo` (boolean)
+- `created_at` (timestamptz)
+- `updated_at` (timestamptz)
+
+### Tabla tecnico_detalles
+- `id` (uuid, PK)
+- `tecnico_id` (uuid, FK -> usuarios.id, unique)
+- `coordinador_id` (uuid, FK -> usuarios.id)
+- `fecha_limite` (timestamptz)
+- `estado_corte` (varchar) — valores: `activo`, `en_servicio`, `suspendido`, `baja`
+- `activo` (boolean)
+- `created_at` (timestamptz, NOT NULL)
+- `updated_at` (timestamptz, NOT NULL)
 
 ## Scripts de utilidad
 
@@ -99,6 +123,9 @@ bun run typecheck
 - Archive: rutas con `:periodo` ahora validan formato `YYYY-MM`; descarga agrega timeout y limite de tamano (puede responder `413`).
 - Documentos PDF: `POST /documentos-pdf` ahora valida que el archivo sea PDF.
 - Asignaciones: rutas de consulta/eliminacion por id agregan validacion UUID en params/query.
+- Migraciones: se actualizo esquema con valores de roles (`admin`, `coordinador`, `tecnico`) y estados de corte (`activo`, `en_servicio`, `suspendido`, `baja`).
+- tecnico_detalles: ahora tiene columnas `created_at` y `updated_at` como NOT NULL.
+- usuarios: se eliminaron columnas `fecha_limite` y `estado_corte` (ya están en `tecnico_detalles`).
 
 ## Arranque rapido
 
