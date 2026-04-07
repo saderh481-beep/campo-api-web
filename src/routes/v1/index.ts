@@ -16,7 +16,6 @@ import zonasRoutes from "@/routes/zonas";
 import localidadesRoutes from "@/routes/localidades";
 import configuracionesRoutes from "@/routes/configuraciones";
 import documentosPlantillaRoutes from "@/routes/documentos-plantilla";
-import documentosPdfRoutes from "@/routes/documentos-pdf";
 
 const v1 = new Hono();
 
@@ -36,6 +35,5 @@ v1.route("/zonas", zonasRoutes);
 v1.route("/localidades", localidadesRoutes);
 v1.route("/configuraciones", configuracionesRoutes);
 v1.route("/documentos-plantilla", documentosPlantillaRoutes);
-v1.route("/documentos-pdf", documentosPdfRoutes);
 
 export default v1;
