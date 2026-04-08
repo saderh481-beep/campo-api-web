@@ -30,17 +30,24 @@ app.post(
   async (c) => {
     try {
       const { correo, codigo_acceso } = c.req.valid("json");
-      const ip = c.req.header("x-forwarded-for") ?? "unknown";
+      const forwardedFor = c.req.header("x-forwarded-for") ?? "unknown";
+      const ip = forwardedFor === "unknown" ? "unknown" : forwardedFor.split(",")[0].trim();
       const userAgent = c.req.header("user-agent") ?? "unknown";
 
       const usuario = await findUsuarioParaLogin(correo);
-      if (!usuario?.hash_codigo_acceso) {
+      if (!usuario) {
+        console.error("[Auth] Usuario no encontrado:", correo);
+        return c.json({ error: "Credenciales inválidas" }, 401);
+      }
+      if (!usuario.hash_codigo_acceso) {
+        console.error("[Auth] Usuario sin hash_codigo_acceso:", correo);
         return c.json({ error: "Credenciales inválidas" }, 401);
       }
 
       const hashIngresado = hashSHA512(codigo_acceso);
       const valido = hashIngresado === usuario.hash_codigo_acceso;
       if (!valido) {
+        console.error("[Auth] Hash no coincide para:", correo);
         return c.json({ error: "Credenciales inválidas" }, 401);
       }
 
@@ -102,7 +109,8 @@ app.post("/logout", authMiddleware, async (c) => {
   try {
     const user = c.get("user");
     const token = c.get("sessionToken");
-    const ip = c.req.header("x-forwarded-for") ?? "unknown";
+    const forwardedFor = c.req.header("x-forwarded-for") ?? "unknown";
+    const ip = forwardedFor === "unknown" ? "unknown" : forwardedFor.split(",")[0].trim();
     const userAgent = c.req.header("user-agent") ?? "unknown";
 
     try {
