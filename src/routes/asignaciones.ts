@@ -43,10 +43,19 @@ app.get("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ tecni
   return c.json(row);
 });
 
-app.post("/coordinador-tecnico", zValidator("json", z.object({ tecnico_id: z.string().uuid(), coordinador_id: z.string().uuid(), fecha_limite: z.string().datetime() })), async (c) => {
-  const body = c.req.valid("json");
-  const row = await createAsignacionCoordinadorTecnico({ tecnico_id: body.tecnico_id, coordinador_id: body.coordinador_id, fecha_limite: body.fecha_limite });
-  return c.json(row, 201);
+app.post("/coordinador-tecnico", zValidator("json", z.object({ tecnico_id: z.string().uuid(), coordinador_id: z.string().uuid(), fecha_limite: z.string().min(1) })), async (c) => {
+  try {
+    const body = c.req.valid("json");
+    const fecha = new Date(body.fecha_limite);
+    if (isNaN(fecha.getTime())) {
+      return c.json({ error: "fecha_limite debe ser una fecha válida" }, 400);
+    }
+    const row = await createAsignacionCoordinadorTecnico({ tecnico_id: body.tecnico_id, coordinador_id: body.coordinador_id, fecha_limite: fecha.toISOString() });
+    return c.json(row, 201);
+  } catch (e) {
+    console.error("[Asignaciones] Error al crear coordinador-tecnico:", e);
+    return c.json({ error: "Error al asignar coordinador" }, 500);
+  }
 });
 
 app.delete("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ tecnico_id: z.string().uuid() })), async (c) => {
@@ -56,12 +65,25 @@ app.delete("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ te
   return c.json({ message: "Asignación eliminada" });
 });
 
-app.patch("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ tecnico_id: z.string().uuid() })), zValidator("json", z.object({ coordinador_id: z.string().uuid().optional(), fecha_limite: z.string().datetime().optional(), activo: z.boolean().optional() })), async (c) => {
-  const { tecnico_id } = c.req.param();
-  const body = c.req.valid("json");
-  const row = await updateAsignacionCoordinadorTecnico(tecnico_id, body);
-  if (!row) return c.json({ error: "Asignación no encontrada" }, 404);
-  return c.json(row);
+app.patch("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ tecnico_id: z.string().uuid() })), zValidator("json", z.object({ coordinador_id: z.string().uuid().optional(), fecha_limite: z.string().min(1).optional(), activo: z.boolean().optional() })), async (c) => {
+  try {
+    const { tecnico_id } = c.req.param();
+    const body = c.req.valid("json");
+    const update: any = { ...body };
+    if (body.fecha_limite) {
+      const fecha = new Date(body.fecha_limite);
+      if (isNaN(fecha.getTime())) {
+        return c.json({ error: "fecha_limite debe ser una fecha válida" }, 400);
+      }
+      update.fecha_limite = fecha.toISOString();
+    }
+    const row = await updateAsignacionCoordinadorTecnico(tecnico_id, update);
+    if (!row) return c.json({ error: "Asignación no encontrada" }, 404);
+    return c.json(row);
+  } catch (e) {
+    console.error("[Asignaciones] Error al actualizar coordinador-tecnico:", e);
+    return c.json({ error: "Error al actualizar asignación" }, 500);
+  }
 });
 
 app.get("/beneficiario", zValidator("query", z.object({ tecnico_id: z.string().uuid().optional(), beneficiario_id: z.string().uuid().optional(), activo: z.enum(["true", "false"]).optional() })), async (c) => {
@@ -78,10 +100,15 @@ app.get("/beneficiario/:id", zValidator("param", z.object({ id: z.string().uuid(
 });
 
 app.post("/beneficiario", zValidator("json", z.object({ tecnico_id: z.string().uuid(), beneficiario_id: z.string().uuid() })), async (c) => {
-  const body = c.req.valid("json");
-  const user = c.get("user");
-  const row = await createAsignacionBeneficiario(body.tecnico_id, body.beneficiario_id, user.sub);
-  return c.json(row, 201);
+  try {
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    const row = await createAsignacionBeneficiario(body.tecnico_id, body.beneficiario_id, user.sub);
+    return c.json(row, 201);
+  } catch (e) {
+    console.error("[Asignaciones] Error al crear asignación beneficiario:", e);
+    return c.json({ error: "Error al asignar beneficiario" }, 500);
+  }
 });
 
 app.delete("/beneficiario/:id", zValidator("param", z.object({ id: z.string().uuid() })), async (c) => {
@@ -113,10 +140,15 @@ app.get("/actividad/:id", zValidator("param", z.object({ id: z.string().uuid() }
 });
 
 app.post("/actividad", zValidator("json", z.object({ tecnico_id: z.string().uuid(), actividad_id: z.string().uuid() })), async (c) => {
-  const body = c.req.valid("json");
-  const user = c.get("user");
-  const row = await createAsignacionActividad(body.tecnico_id, body.actividad_id, user.sub);
-  return c.json(row, 201);
+  try {
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    const row = await createAsignacionActividad(body.tecnico_id, body.actividad_id, user.sub);
+    return c.json(row, 201);
+  } catch (e) {
+    console.error("[Asignaciones] Error al crear asignación actividad:", e);
+    return c.json({ error: "Error al asignar actividad" }, 500);
+  }
 });
 
 app.delete("/actividad/:id", zValidator("param", z.object({ id: z.string().uuid() })), async (c) => {
