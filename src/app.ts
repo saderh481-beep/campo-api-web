@@ -11,10 +11,18 @@ const app = new Hono();
 
 app.use("*", logger());
 app.use("*", secureHeaders());
+const getCorsOrigin = () => {
+  const env = process.env.NODE_ENV;
+  if (env === "production") {
+    return process.env.WEB_ORIGIN_PROD ?? process.env.WEB_ORIGIN ?? "*";
+  }
+  return process.env.WEB_ORIGIN ?? "http://localhost:5173";
+};
+
 app.use(
   "*",
   cors({
-    origin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
+    origin: getCorsOrigin(),
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
