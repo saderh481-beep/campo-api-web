@@ -17,7 +17,7 @@ export type UsuarioUpdateInput = {
 };
 
 export async function listUsuarios() {
-  return sql`
+  return await sql`
     SELECT id, nombre, correo, rol, telefono, activo, created_at
     FROM usuarios
     ORDER BY created_at DESC

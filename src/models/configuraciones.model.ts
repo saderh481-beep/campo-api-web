@@ -12,7 +12,7 @@ export type ConfiguracionUpdateInput = {
 };
 
 export async function listConfiguraciones() {
-  return sql`
+  return await sql`
     SELECT id, clave, valor, descripcion, updated_by, updated_at
     FROM configuraciones
     ORDER BY clave

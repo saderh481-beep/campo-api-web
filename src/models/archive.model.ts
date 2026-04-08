@@ -1,7 +1,7 @@
 import { sql } from "@/db";
 
 export async function listArchiveLogs() {
-  return sql`
+  return await sql`
     SELECT id, periodo, total_bitacoras, total_fotos, bytes_comprimidos,
            r2_key_staging, sha256_paquete, estado, descargado_en,
            confirmado_en, confirmado_por, created_at

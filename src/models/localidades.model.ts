@@ -15,7 +15,7 @@ export type LocalidadUpdateInput = {
 };
 
 export async function listLocalidades() {
-  return sql`
+  return await sql`
     SELECT id, zona_id, municipio, nombre, cp, activo, created_at, updated_at
     FROM localidades
     WHERE activo = true

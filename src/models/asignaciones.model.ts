@@ -3,7 +3,7 @@ import type { TecnicoDetalleInput } from "./tecnico-detalles.model";
 
 export async function listAsignacionesCoordinadorTecnico(tecnicoId?: string) {
   if (tecnicoId) {
-    return sql`
+    return await sql`
       SELECT td.tecnico_id AS id, td.coordinador_id, td.fecha_limite, td.estado_corte, t.nombre AS tecnico_nombre, c.nombre AS coordinador_nombre
       FROM tecnico_detalles td
       JOIN usuarios t ON t.id = td.tecnico_id
@@ -11,7 +11,7 @@ export async function listAsignacionesCoordinadorTecnico(tecnicoId?: string) {
       WHERE td.tecnico_id = ${tecnicoId} AND td.activo = true
     `;
   }
-  return sql`
+  return await sql`
     SELECT td.tecnico_id AS id, td.coordinador_id, td.fecha_limite, td.estado_corte, t.nombre AS tecnico_nombre, c.nombre AS coordinador_nombre
     FROM tecnico_detalles td
     JOIN usuarios t ON t.id = td.tecnico_id
@@ -72,7 +72,7 @@ export async function listAsignacionesBeneficiario(filters: { tecnico_id?: strin
   if (filters.tecnico_id) query = sql`${query} AND ab.tecnico_id = ${filters.tecnico_id}`;
   if (filters.beneficiario_id) query = sql`${query} AND ab.beneficiario_id = ${filters.beneficiario_id}`;
   if (filters.activo !== undefined) query = sql`${query} AND ab.activo = ${filters.activo}`;
-  return query;
+  return await query;
 }
 
 export async function getAsignacionBeneficiarioById(id: string) {
@@ -123,7 +123,7 @@ export async function listAsignacionesActividad(filters: { tecnico_id?: string; 
   if (filters.tecnico_id) query = sql`${query} AND aa.tecnico_id = ${filters.tecnico_id}`;
   if (filters.actividad_id) query = sql`${query} AND aa.actividad_id = ${filters.actividad_id}`;
   if (filters.activo !== undefined) query = sql`${query} AND aa.activo = ${filters.activo}`;
-  return query;
+  return await query;
 }
 
 export async function getAsignacionActividadById(id: string) {

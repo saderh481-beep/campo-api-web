@@ -6,7 +6,7 @@ export type BeneficiarioCadenaInput = {
 };
 
 export async function getCadenasByBeneficiarioId(beneficiarioId: string) {
-  return sql`
+  return await sql`
     SELECT cp.id, cp.nombre
     FROM beneficiario_cadenas bc
     JOIN cadenas_productivas cp ON cp.id = bc.cadena_id

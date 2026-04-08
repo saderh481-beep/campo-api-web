@@ -22,14 +22,14 @@ export type DocumentoPdfUpdateInput = {
 
 export async function listDocumentosPdf(activos?: boolean) {
   if (activos) {
-    return sql`
+    return await sql`
       SELECT id, clave, nombre, descripcion, mime_type, bytes, sha256, activo, created_at, updated_at
       FROM documentos_pdf
       WHERE activo = true
       ORDER BY clave
     `;
   }
-  return sql`
+  return await sql`
     SELECT id, clave, nombre, descripcion, mime_type, bytes, sha256, activo, created_at, updated_at
     FROM documentos_pdf
     ORDER BY clave
