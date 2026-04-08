@@ -4,17 +4,21 @@ export type UsuarioInput = {
   correo: string;
   nombre: string;
   rol: "tecnico" | "coordinador" | "admin";
+  telefono?: string | null;
 };
 
 export type UsuarioUpdateInput = {
   correo?: string;
   nombre?: string;
+  telefono?: string | null;
+  rol?: string;
   codigo_acceso?: string;
+  activo?: boolean;
 };
 
 export async function listUsuarios() {
   return sql`
-    SELECT id, nombre, correo, codigo_acceso, hash_codigo_acceso
+    SELECT id, nombre, correo, rol, telefono, activo, created_at
     FROM usuarios
     ORDER BY created_at DESC
   `;
@@ -22,7 +26,7 @@ export async function listUsuarios() {
 
 export async function findUsuarioById(id: string) {
   const [row] = await sql`
-    SELECT id, nombre, correo, codigo_acceso, hash_codigo_acceso
+    SELECT id, nombre, correo, rol, telefono, activo, created_at
     FROM usuarios
     WHERE id = ${id}
   `;
@@ -43,8 +47,8 @@ export async function existsUsuarioByCodigo(codigo: string) {
 
 export async function createUsuario(input: UsuarioInput & { codigo_acceso: string; hash_codigo_acceso: string }) {
   const [row] = await sql`
-    INSERT INTO usuarios (correo, nombre, rol, codigo_acceso, hash_codigo_acceso)
-    VALUES (${input.correo}, ${input.nombre}, ${input.rol}, ${input.codigo_acceso}, ${input.hash_codigo_acceso})
+    INSERT INTO usuarios (correo, nombre, rol, telefono, codigo_acceso, hash_codigo_acceso)
+    VALUES (${input.correo}, ${input.nombre}, ${input.rol}, ${input.telefono ?? null}, ${input.codigo_acceso}, ${input.hash_codigo_acceso})
     RETURNING id, nombre, correo, codigo_acceso, hash_codigo_acceso
   `;
   return row;
@@ -55,11 +59,14 @@ export async function updateUsuario(id: string, input: UsuarioUpdateInput & { ha
     UPDATE usuarios SET
       nombre = COALESCE(${input.nombre ?? null}, nombre),
       correo = COALESCE(${input.correo ?? null}, correo),
+      telefono = COALESCE(${input.telefono ?? null}, telefono),
+      rol = COALESCE(${input.rol ?? null}, rol),
+      activo = COALESCE(${input.activo ?? null}, activo),
       codigo_acceso = COALESCE(${input.codigo_acceso ?? null}, codigo_acceso),
       hash_codigo_acceso = COALESCE(${input.hash_codigo_acceso ?? null}, hash_codigo_acceso),
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING id, nombre, correo, codigo_acceso, hash_codigo_acceso
+    RETURNING id, nombre, correo, rol, telefono, activo, created_at
   `;
   return row ?? null;
 }
