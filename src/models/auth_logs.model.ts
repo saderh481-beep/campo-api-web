@@ -18,7 +18,7 @@ export async function createAuthLog(input: AuthLogInput) {
 }
 
 export async function listAuthLogsByActorId(actorId: string, limit = 50) {
-  return sql`
+  return await sql`
     SELECT id, actor_id, actor_tipo, accion, ip, user_agent, created_at
     FROM auth_logs
     WHERE actor_id = ${actorId}

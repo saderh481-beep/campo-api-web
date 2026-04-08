@@ -11,7 +11,7 @@ export type ActividadUpdateInput = {
 };
 
 export async function listActividades() {
-  return sql`
+  return await sql`
     SELECT id, nombre, descripcion, activo, created_by, created_at, updated_at
     FROM actividades
     WHERE activo = true

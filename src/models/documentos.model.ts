@@ -11,7 +11,7 @@ export type DocumentoInput = {
 };
 
 export async function listDocumentosByBeneficiarioId(beneficiarioId: string) {
-  return sql`
+  return await sql`
     SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
     FROM documentos
     WHERE beneficiario_id = ${beneficiarioId}
@@ -20,7 +20,7 @@ export async function listDocumentosByBeneficiarioId(beneficiarioId: string) {
 }
 
 export async function listDocumentosByBeneficiarioIdAndTipo(beneficiarioId: string, tipo: string) {
-  return sql`
+  return await sql`
     SELECT id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
     FROM documentos
     WHERE beneficiario_id = ${beneficiarioId} AND tipo = ${tipo}

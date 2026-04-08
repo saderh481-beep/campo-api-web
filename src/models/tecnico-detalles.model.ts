@@ -56,7 +56,7 @@ export async function updateTecnicoDetalle(tecnicoId: string, input: TecnicoDeta
 }
 
 export async function listTecnicosIdsByCoordinadorId(coordinadorId: string) {
-  return sql`
+  return await sql`
     SELECT td.tecnico_id AS id
     FROM tecnico_detalles td
     JOIN usuarios t ON t.id = td.tecnico_id

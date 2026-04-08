@@ -56,7 +56,7 @@ export type BeneficiarioWithRelations = {
 
 export async function listBeneficiariosByUser(userId: string, rol: string) {
   if (rol === "admin") {
-    return sql`
+    return await sql`
       SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
              b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
              b.coord_parcela, b.activo, b.created_at, b.updated_at
@@ -66,7 +66,7 @@ export async function listBeneficiariosByUser(userId: string, rol: string) {
     `;
   }
 
-  return sql`
+  return await sql`
     SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
            b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
            b.coord_parcela, b.activo, b.created_at, b.updated_at

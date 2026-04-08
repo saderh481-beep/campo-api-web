@@ -11,7 +11,7 @@ export type CadenaUpdateInput = {
 };
 
 export async function listCadenas() {
-  return sql`
+  return await sql`
     SELECT id, nombre, descripcion, activo, created_by, created_at, updated_at
     FROM cadenas_productivas
     WHERE activo = true

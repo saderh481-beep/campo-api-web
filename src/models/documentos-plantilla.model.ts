@@ -18,14 +18,14 @@ export type DocumentoPlantillaUpdateInput = {
 
 export async function listDocumentosPlantilla(includeInactive = false) {
   if (includeInactive) {
-    return sql`
+    return await sql`
       SELECT id, nombre, descripcion, obligatorio, orden, configuracion, activo, created_at, updated_at
       FROM documentos_plantilla
       ORDER BY orden, nombre
     `;
   }
 
-  return sql`
+  return await sql`
     SELECT id, nombre, descripcion, obligatorio, orden, configuracion
     FROM documentos_plantilla
     WHERE activo = true

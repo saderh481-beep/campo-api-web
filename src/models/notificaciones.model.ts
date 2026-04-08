@@ -9,7 +9,7 @@ export type NotificacionInput = {
 };
 
 export async function listNotificacionesNoLeidas(destinoId: string) {
-  return sql`
+  return await sql`
     SELECT id, destino_id, destino_tipo, tipo, titulo, cuerpo, leido,
            enviado_push, enviado_email, created_at
     FROM notificaciones
@@ -19,7 +19,7 @@ export async function listNotificacionesNoLeidas(destinoId: string) {
 }
 
 export async function listNotificacionesByDestino(destinoId: string, limit = 50) {
-  return sql`
+  return await sql`
     SELECT id, destino_id, destino_tipo, tipo, titulo, cuerpo, leido,
            enviado_push, enviado_email, created_at
     FROM notificaciones

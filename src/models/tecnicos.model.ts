@@ -11,7 +11,7 @@ export type TecnicoUpdateInput = {
 
 export async function listTecnicosByRole(userId: string, rol: string) {
   if (rol === "admin") {
-    return sql`
+    return await sql`
       SELECT t.id, t.nombre, t.correo, t.telefono, td.coordinador_id, td.fecha_limite,
              td.estado_corte, t.codigo_acceso, t.activo, t.created_at, t.updated_at,
              u.nombre AS coordinador_nombre
@@ -23,7 +23,7 @@ export async function listTecnicosByRole(userId: string, rol: string) {
     `;
   }
 
-  return sql`
+  return await sql`
     SELECT t.id, t.nombre, t.correo, t.telefono, td.coordinador_id, td.fecha_limite,
            td.estado_corte, t.codigo_acceso, t.activo, t.created_at, t.updated_at,
            u.nombre AS coordinador_nombre
