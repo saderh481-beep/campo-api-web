@@ -1,13 +1,17 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { compare } from "bcryptjs";
+import { createHash } from "node:crypto";
 import { rateLimitMiddleware } from "@/middleware/ratelimit";
 import { authMiddleware } from "@/middleware/auth";
 import { redis } from "@/lib/redis";
 import { signJwt } from "@/lib/jwt";
 import { createAuthLog, findUsuarioParaLogin } from "@/models/auth.model";
 import type { AppEnv, SessionPayload } from "@/types/http";
+
+function hashSHA512(input: string): string {
+  return createHash("sha512").update(input).digest("hex");
+}
 
 const app = new Hono<AppEnv>();
 const SESSION_TTL_SECONDS = 86400;
@@ -34,7 +38,8 @@ app.post(
         return c.json({ error: "Credenciales inválidas" }, 401);
       }
 
-      const valido = await compare(codigo_acceso, usuario.hash_codigo_acceso);
+      const hashIngresado = hashSHA512(codigo_acceso);
+      const valido = hashIngresado === usuario.hash_codigo_acceso;
       if (!valido) {
         return c.json({ error: "Credenciales inválidas" }, 401);
       }
