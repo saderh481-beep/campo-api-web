@@ -15,10 +15,10 @@ app.use("*", secureHeaders());
 app.use(
   "*",
   cors({
-    origin: ["https://web-campo-campo-saas.up.railway.app", "http://localhost:5173"],
+    origin: "*",
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "Accept"],
+    allowHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
   })
 );
 
