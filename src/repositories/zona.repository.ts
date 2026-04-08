@@ -21,9 +21,10 @@ export async function findZonaById(id: string): Promise<Zona | null> {
 }
 
 export async function createZona(data: ZonaCreate & { created_by: string }): Promise<Zona> {
+  const descripcionValue = data.descripcion ?? null;
   const [row] = await sql`
     INSERT INTO zonas (nombre, descripcion, created_by)
-    VALUES (${data.nombre}, ${data.descripcion ?? null}, ${data.created_by})
+    VALUES (${data.nombre}, ${descripcionValue}, ${data.created_by})
     RETURNING id, nombre, descripcion, activo, created_at, updated_at
   `;
   return row as Zona;

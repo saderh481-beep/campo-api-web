@@ -29,9 +29,10 @@ export async function findConfiguracionByClave(clave: string) {
 }
 
 export async function createConfiguracion(input: ConfiguracionInput, userId: string) {
+  const descripcionValue = input.descripcion ?? null;
   const [config] = await sql`
     INSERT INTO configuraciones (clave, valor, descripcion, updated_by)
-    VALUES (${input.clave}, ${JSON.stringify(input.valor)}::jsonb, ${input.descripcion ?? null}, ${userId})
+    VALUES (${input.clave}, ${JSON.stringify(input.valor)}::jsonb, ${descripcionValue}, ${userId})
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, updated_by = EXCLUDED.updated_by, updated_at = NOW()
     RETURNING id, clave, valor, descripcion, updated_by, updated_at
   `;
@@ -51,9 +52,10 @@ export async function updateConfiguracion(clave: string, valor: Record<string, u
 }
 
 export async function upsertConfiguracion(clave: string, valor: Record<string, unknown>, userId: string, descripcion?: string) {
+  const descripcionValue = descripcion ?? null;
   const [config] = await sql`
     INSERT INTO configuraciones (clave, valor, descripcion, updated_by)
-    VALUES (${clave}, ${JSON.stringify(valor)}::jsonb, ${descripcion ?? null}, ${userId})
+    VALUES (${clave}, ${JSON.stringify(valor)}::jsonb, ${descripcionValue}, ${userId})
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, updated_by = EXCLUDED.updated_by, updated_at = NOW()
     RETURNING id, clave, valor, descripcion, updated_by, updated_at
   `;

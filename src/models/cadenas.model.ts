@@ -20,9 +20,10 @@ export async function listCadenas() {
 }
 
 export async function createCadena(input: CadenaInput, userId: string) {
+  const descripcionValue = input.descripcion ?? null;
   const [row] = await sql`
     INSERT INTO cadenas_productivas (nombre, descripcion, created_by)
-    VALUES (${input.nombre}, ${input.descripcion ?? null}, ${userId})
+    VALUES (${input.nombre}, ${descripcionValue}, ${userId})
     RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
   `;
   return row;

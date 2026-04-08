@@ -55,10 +55,12 @@ export async function findDocumentoPdfById(id: string) {
 }
 
 export async function createDocumentoPdf(input: DocumentoPdfInput, userId: string) {
+  const descripcionValue = input.descripcion ?? null;
+  const bytesValue = input.bytes ?? null;
   const [row] = await sql`
     INSERT INTO documentos_pdf (clave, nombre, descripcion, mime_type, bytes, r2_key, sha256, created_by)
-    VALUES (${input.clave}, ${input.nombre}, ${input.descripcion ?? null},
-            ${input.mime_type ?? 'application/pdf'}, ${input.bytes ?? null},
+    VALUES (${input.clave}, ${input.nombre}, ${descripcionValue},
+            ${input.mime_type ?? 'application/pdf'}, ${bytesValue},
             ${input.r2_key}, ${input.sha256}, ${userId})
     RETURNING id, clave, nombre, descripcion, mime_type, bytes, sha256, activo, created_at, updated_at
   `;
