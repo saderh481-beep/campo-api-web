@@ -93,6 +93,11 @@ app.post("/login", rateLimitMiddleware(10, 60), zValidator("json", z.object({ co
 app.post("/request-otp", rateLimitMiddleware(5, 60), zValidator("json", z.object({ correo: z.string().email() })), (c) => c.json({ message: "Código ya asignado. Usa tu código de acceso." }));
 app.post("/verify-otp", rateLimitMiddleware(10, 60), zValidator("json", z.object({ correo: z.string().email(), codigo_acceso: z.string().regex(/^\d{5,6}$/) })), async (c) => c.redirect("/api/v1/auth/verify-codigo-acceso", 307));
 
+app.get("/me", authMiddleware, async (c) => {
+  const user = c.get("user");
+  return c.json({ usuario: { id: user.sub, nombre: user.nombre, correo: user.correo, rol: user.rol } });
+});
+
 app.post("/logout", authMiddleware, async (c) => {
   try {
     const user = c.get("user");
