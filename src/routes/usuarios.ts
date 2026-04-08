@@ -49,7 +49,7 @@ app.post(
       rol: z.enum(["tecnico", "coordinador", "admin"]),
       telefono: z.string().optional(),
       coordinador_id: z.string().uuid().optional(),
-      fecha_limite: z.string().datetime().optional(),
+      fecha_limite: z.string().min(1).optional(),
     })
   ),
   async (c) => {
@@ -88,11 +88,14 @@ app.post(
       if (!row) return c.json({ error: "Error al crear usuario" }, 500);
 
       if (body.rol === "tecnico" && body.coordinador_id && body.fecha_limite) {
-        await upsertTecnicoDetalle({
-          tecnico_id: row.id,
-          coordinador_id: body.coordinador_id,
-          fecha_limite: body.fecha_limite,
-        });
+        const fecha = new Date(body.fecha_limite);
+        if (!isNaN(fecha.getTime())) {
+          await upsertTecnicoDetalle({
+            tecnico_id: row.id,
+            coordinador_id: body.coordinador_id,
+            fecha_limite: fecha.toISOString(),
+          });
+        }
       }
 
       return c.json({ ...row, codigo }, 201);
