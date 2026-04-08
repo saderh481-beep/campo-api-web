@@ -38,10 +38,12 @@ export async function findDocumentoById(id: string) {
 }
 
 export async function createDocumento(input: DocumentoInput) {
+  const nombreOriginalValue = input.nombre_original ?? null;
+  const bytesValue = input.bytes ?? null;
   const [row] = await sql`
     INSERT INTO documentos (beneficiario_id, tipo, nombre_original, r2_key, sha256, bytes, subido_por)
-    VALUES (${input.beneficiario_id}, ${input.tipo}, ${input.nombre_original ?? null},
-            ${input.r2_key}, ${input.sha256}, ${input.bytes ?? null}, ${input.subido_por})
+    VALUES (${input.beneficiario_id}, ${input.tipo}, ${nombreOriginalValue},
+            ${input.r2_key}, ${input.sha256}, ${bytesValue}, ${input.subido_por})
     RETURNING id, beneficiario_id, tipo, nombre_original, r2_key, sha256, bytes, subido_por, created_at
   `;
   return row;

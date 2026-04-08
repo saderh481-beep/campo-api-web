@@ -151,12 +151,18 @@ export async function createBeneficiario(
   input: BeneficiarioInput & { coordParcela: string | null },
   userId: string
 ) {
+  const localidadValue = input.localidad ?? null;
+  const localidadIdValue = input.localidad_id ?? null;
+  const direccionValue = input.direccion ?? null;
+  const cpValue = input.cp ?? null;
+  const telefonoPrincipalValue = input.telefono_principal ?? null;
+  const telefonoSecundarioValue = input.telefono_secundario ?? null;
   const [row] = await sql`
     INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
                               telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-    VALUES (${input.nombre}, ${input.municipio}, ${input.localidad ?? null},
-            ${input.localidad_id ?? null}, ${input.direccion ?? null}, ${input.cp ?? null},
-            ${input.telefono_principal ?? null}, ${input.telefono_secundario ?? null},
+    VALUES (${input.nombre}, ${input.municipio}, ${localidadValue},
+            ${localidadIdValue}, ${direccionValue}, ${cpValue},
+            ${telefonoPrincipalValue}, ${telefonoSecundarioValue},
             ${input.coordParcela}::point, ${input.tecnico_id})
     RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
               telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
@@ -169,14 +175,20 @@ export async function createBeneficiarioWithAsignacion(
   userId: string
 ) {
   const reserved = await sql.reserve();
+  const localidadValue = input.localidad ?? null;
+  const localidadIdValue = input.localidad_id ?? null;
+  const direccionValue = input.direccion ?? null;
+  const cpValue = input.cp ?? null;
+  const telefonoPrincipalValue = input.telefono_principal ?? null;
+  const telefonoSecundarioValue = input.telefono_secundario ?? null;
   try {
     await reserved`BEGIN`;
     const [row] = await reserved`
       INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
                                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-      VALUES (${input.nombre}, ${input.municipio}, ${input.localidad ?? null},
-              ${input.localidad_id ?? null}, ${input.direccion ?? null}, ${input.cp ?? null},
-              ${input.telefono_principal ?? null}, ${input.telefono_secundario ?? null},
+      VALUES (${input.nombre}, ${input.municipio}, ${localidadValue},
+              ${localidadIdValue}, ${direccionValue}, ${cpValue},
+              ${telefonoPrincipalValue}, ${telefonoSecundarioValue},
               ${input.coordParcela}::point, ${input.tecnico_id})
       RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at

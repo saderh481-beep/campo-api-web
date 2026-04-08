@@ -46,9 +46,10 @@ export async function existsUsuarioByCodigo(codigo: string) {
 }
 
 export async function createUsuario(input: UsuarioInput & { codigo_acceso: string; hash_codigo_acceso: string }) {
+  const telefonoValue = input.telefono ?? null;
   const [row] = await sql`
     INSERT INTO usuarios (correo, nombre, rol, telefono, codigo_acceso, hash_codigo_acceso)
-    VALUES (${input.correo}, ${input.nombre}, ${input.rol}, ${input.telefono ?? null}, ${input.codigo_acceso}, ${input.hash_codigo_acceso})
+    VALUES (${input.correo}, ${input.nombre}, ${input.rol}, ${telefonoValue}, ${input.codigo_acceso}, ${input.hash_codigo_acceso})
     RETURNING id, nombre, correo, codigo_acceso, hash_codigo_acceso
   `;
   return row;

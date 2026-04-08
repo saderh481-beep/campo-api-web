@@ -34,9 +34,11 @@ export async function existsZonaActiva(zonaId: string) {
 }
 
 export async function createLocalidad(input: LocalidadInput, userId: string) {
+  const zonaIdValue = input.zona_id ?? null;
+  const cpValue = input.cp ?? null;
   const [localidad] = await sql`
     INSERT INTO localidades (zona_id, municipio, nombre, cp, created_by)
-    VALUES (${input.zona_id ?? null}, ${input.municipio}, ${input.nombre}, ${input.cp ?? null}, ${userId})
+    VALUES (${zonaIdValue}, ${input.municipio}, ${input.nombre}, ${cpValue}, ${userId})
     RETURNING id, zona_id, municipio, nombre, cp, activo, created_at, updated_at
   `;
   return localidad;

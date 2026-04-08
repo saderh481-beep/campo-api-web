@@ -9,9 +9,11 @@ export type AuthLogInput = {
 };
 
 export async function createAuthLog(input: AuthLogInput) {
+  const ipValue = input.ip ?? null;
+  const userAgentValue = input.user_agent ?? null;
   const [row] = await sql`
     INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)
-    VALUES (${input.actor_id}, ${input.actor_tipo}, ${input.accion}, ${input.ip ?? null}, ${input.user_agent ?? null})
+    VALUES (${input.actor_id}, ${input.actor_tipo}, ${input.accion}, ${ipValue}, ${userAgentValue})
     RETURNING id, actor_id, actor_tipo, accion, ip, user_agent, created_at
   `;
   return row;

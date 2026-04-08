@@ -14,9 +14,10 @@ export class ActividadRepository implements IActividadRepository {
   }
 
   async create(data: ActividadCreate, userId: string): Promise<Actividad> {
+    const descripcionValue = data.descripcion ?? null;
     const [row] = await sql`
       INSERT INTO actividades (nombre, descripcion, created_by)
-      VALUES (${data.nombre}, ${data.descripcion ?? null}, ${userId})
+      VALUES (${data.nombre}, ${descripcionValue}, ${userId})
       RETURNING id, nombre, descripcion, activo, created_by, created_at, updated_at
     `;
     return row as unknown as Actividad;

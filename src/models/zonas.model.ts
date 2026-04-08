@@ -20,9 +20,10 @@ export async function listZonas() {
 }
 
 export async function createZona(input: ZonaInput, userId: string) {
+  const descripcionValue = input.descripcion ?? null;
   const [zona] = await sql`
     INSERT INTO zonas (nombre, descripcion, created_by)
-    VALUES (${input.nombre}, ${input.descripcion ?? null}, ${userId})
+    VALUES (${input.nombre}, ${descripcionValue}, ${userId})
     RETURNING id, nombre, descripcion, activo, created_at, updated_at
   `;
   return zona;
