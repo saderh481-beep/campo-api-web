@@ -30,7 +30,12 @@ export async function marcarTecnicoVencido(usuarioId: string) {
 export async function createAuthLog(actorId: string, accion: "login" | "logout", ip: string, userAgent: string | null) {
   let validIp: string | null = null;
   if (ip && ip !== "unknown") {
-    validIp = ip.split(",")[0].trim();
+    // Tomar solo la primera IP y limpiar espacios
+    const cleanIp = ip.split(",")[0].trim();
+    // Validar que sea una IP válida (IPv4)
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(cleanIp)) {
+      validIp = cleanIp;
+    }
   }
   await sql`
     INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)

@@ -30,7 +30,8 @@ app.post(
   async (c) => {
     try {
       const { correo, codigo_acceso } = c.req.valid("json");
-      const ip = c.req.header("x-forwarded-for") ?? "unknown";
+      const forwardedFor = c.req.header("x-forwarded-for") ?? "unknown";
+      const ip = forwardedFor === "unknown" ? "unknown" : forwardedFor.split(",")[0].trim();
       const userAgent = c.req.header("user-agent") ?? "unknown";
 
       const usuario = await findUsuarioParaLogin(correo);
@@ -108,7 +109,8 @@ app.post("/logout", authMiddleware, async (c) => {
   try {
     const user = c.get("user");
     const token = c.get("sessionToken");
-    const ip = c.req.header("x-forwarded-for") ?? "unknown";
+    const forwardedFor = c.req.header("x-forwarded-for") ?? "unknown";
+    const ip = forwardedFor === "unknown" ? "unknown" : forwardedFor.split(",")[0].trim();
     const userAgent = c.req.header("user-agent") ?? "unknown";
 
     try {
