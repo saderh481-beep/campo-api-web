@@ -49,8 +49,8 @@ app.post(
     "json",
     z.object({
       correo: z.string().email(),
-      nombre: z.string().min(2),
-      rol: z.enum(["tecnico", "coordinador", "admin"]),
+      nombre: z.string().min(1),
+      rol: z.string(),
       telefono: z.string().optional(),
       coordinador_id: z.string().uuid().optional(),
       fecha_limite: z.string().min(1).optional(),
@@ -61,11 +61,18 @@ app.post(
       const body = c.req.valid("json");
       const user = c.get("user");
 
-      if (body.rol === "coordinador" && user.rol !== "admin") {
+      const rolLower = body.rol.toLowerCase();
+      const rolNormalizado = rolLower === "administrador" ? "admin" : rolLower;
+
+      if (!["admin", "coordinador", "tecnico"].includes(rolNormalizado)) {
+        return c.json({ error: "Rol inválido" }, 400);
+      }
+
+      if (rolNormalizado === "coordinador" && user.rol !== "admin") {
         return c.json({ error: "Solo los administradores pueden crear coordinadores" }, 403);
       }
 
-      if (body.rol === "tecnico" && body.coordinador_id) {
+      if (rolNormalizado === "tecnico" && body.coordinador_id) {
         const [coordinador] = await sql`SELECT id FROM usuarios WHERE id = ${body.coordinador_id} AND rol = 'coordinador' AND activo = true`;
         if (!coordinador) {
           return c.json({ error: "Coordinador no válido o inactivo" }, 400);
@@ -82,7 +89,7 @@ const codigo = randomInt(10000, 100000).toString();
       const input = {
         correo: body.correo,
         nombre: body.nombre,
-        rol: body.rol,
+        rol: rolNormalizado,
         telefono: body.telefono ?? null,
         codigo_acceso: codigo,
         hash_codigo_acceso: hashCodigo,
@@ -91,7 +98,7 @@ const codigo = randomInt(10000, 100000).toString();
       const row = await createUsuario(input);
       if (!row) return c.json({ error: "Error al crear usuario" }, 500);
 
-      if (body.rol === "tecnico" && body.coordinador_id && body.fecha_limite) {
+      if (rolNormalizado === "tecnico" && body.coordinador_id && body.fecha_limite) {
         const fecha = new Date(body.fecha_limite);
         if (!isNaN(fecha.getTime())) {
           await upsertTecnicoDetalle({
