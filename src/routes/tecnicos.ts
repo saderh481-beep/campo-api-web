@@ -1,13 +1,18 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { hash } from "bcryptjs";
-import { randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
+import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { applyCortesVencidos, cerrarCorteById, deactivateTecnico, existsCorreoEnUsuarioActivo, findTecnicoById, isCoordinadorActivo, listAsignacionesByTecnicoId, listTecnicosByRole, updateTecnico, updateTecnicoCodigo, type TecnicoUpdateInput } from "@/models/tecnicos.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
+
+function hashSHA512(input: string): string {
+  return createHash("sha512").update(input).digest("hex");
+}
+
 app.use("*", authMiddleware);
 
 app.get("/", requireRole("admin", "coordinador"), async (c) => {
@@ -45,7 +50,7 @@ app.get(
 
 app.post(
   "/",
-  requireRole("admin"),
+  requireRole("admin", "coordinador"),
   zValidator(
     "json",
     z.object({
@@ -53,11 +58,52 @@ app.post(
       correo: z.string().email(),
       telefono: z.string().optional(),
       coordinador_id: z.string().uuid(),
-      fecha_limite: z.string().datetime(),
+      fecha_limite: z.string().datetime().optional(),
     })
   ),
   async (c) => {
-    return c.json({ error: "La creación de técnicos se realiza desde /usuarios con rol 'tecnico'." }, 405);
+    try {
+      const body = c.req.valid("json");
+      const user = c.get("user");
+
+      if (user.rol === "coordinador" && body.coordinador_id !== user.sub) {
+        return c.json({ error: "No puedes asignar otro coordinador" }, 403);
+      }
+
+      const [existingCoordinador] = await sql`
+        SELECT id FROM usuarios WHERE id = ${body.coordinador_id} AND rol = 'coordinador' AND activo = true
+      `;
+      if (!existingCoordinador) {
+        return c.json({ error: "Coordinador inválido o inactivo" }, 400);
+      }
+
+      const [existing] = await sql`
+        SELECT id FROM usuarios WHERE correo = ${body.correo} AND activo = true
+      `;
+      if (existing) {
+        return c.json({ error: "El correo ya está registrado" }, 409);
+      }
+
+      const codigo = randomInt(10000, 100000).toString();
+      const hashCodigo = hashSHA512(codigo);
+
+      const [row] = await sql`
+        INSERT INTO usuarios (correo, nombre, rol, telefono, codigo_acceso, hash_codigo_acceso)
+        VALUES (${body.correo}, ${body.nombre}, 'tecnico', ${body.telefono ?? null}, ${codigo}, ${hashCodigo})
+        RETURNING id, nombre, correo, rol, telefono, activo, created_at
+      `;
+
+      const [detalle] = await sql`
+        INSERT INTO tecnico_detalles (tecnico_id, coordinador_id, fecha_limite, estado_corte, activo)
+        VALUES (${row.id}, ${body.coordinador_id}, ${body.fecha_limite ? body.fecha_limite : null}, 'en_servicio', true)
+        RETURNING id
+      `;
+
+      return c.json({ ...row, detalle, codigo }, 201);
+    } catch (e) {
+      console.error("[Tecnicos] Error al crear:", e);
+      return c.json({ error: "Error al crear técnico" }, 500);
+    }
   }
 );
 
@@ -102,10 +148,14 @@ app.post(
   async (c) => {
     try {
       const { id } = c.req.param();
-      const tecnico = await findTecnicoById(id);
+      function hashSHA512(input: string): string {
+  return createHash("sha512").update(input).digest("hex");
+}
+
+const tecnico = await findTecnicoById(id);
       if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
       const codigo = randomInt(10000, 100000).toString();
-      const hashCodigo = await hash(codigo, 12);
+      const hashCodigo = hashSHA512(codigo);
       await updateTecnicoCodigo(id, codigo, hashCodigo);
       return c.json({ message: "Código regenerado", codigo });
     } catch (e) {

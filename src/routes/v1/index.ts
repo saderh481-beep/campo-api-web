@@ -2,6 +2,8 @@ import { Hono } from "hono";
 
 import authRoutes from "@/routes/auth";
 import usuariosRoutes from "@/routes/usuarios";
+import administradoresRoutes from "@/routes/administradores";
+import coordinadoresRoutes from "@/routes/coordinadores";
 import tecnicosRoutes from "@/routes/tecnicos";
 import cadenasRoutes from "@/routes/cadenas";
 import actividadesRoutes from "@/routes/actividades";
@@ -21,6 +23,8 @@ const v1 = new Hono();
 
 v1.route("/auth", authRoutes);
 v1.route("/usuarios", usuariosRoutes);
+v1.route("/administradores", administradoresRoutes);
+v1.route("/coordinadores", coordinadoresRoutes);
 v1.route("/tecnicos", tecnicosRoutes);
 v1.route("/cadenas-productivas", cadenasRoutes);
 v1.route("/actividades", actividadesRoutes);
