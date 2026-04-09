@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { hash } from "bcryptjs";
+import { createHash } from "node:crypto";
 import { randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
@@ -10,6 +10,10 @@ import { upsertTecnicoDetalle } from "@/models/tecnico-detalles.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
+
+function hashSHA512(input: string): string {
+  return createHash("sha512").update(input).digest("hex");
+}
 
 app.get("/me", authMiddleware, async (c) => {
   try {
@@ -72,15 +76,15 @@ app.post(
         return c.json({ error: "El correo ya está registrado" }, 409);
       }
 
-      const codigo = randomInt(10000, 100000).toString();
-      const hashCodigo = await hash(codigo, 12);
+const codigo = randomInt(10000, 100000).toString();
+      const hashCodigo = hashSHA512(codigo);
 
       const input = {
         correo: body.correo,
         nombre: body.nombre,
         rol: body.rol,
         telefono: body.telefono ?? null,
-        codigo,
+        codigo_acceso: codigo,
         hash_codigo_acceso: hashCodigo,
       } as Parameters<typeof createUsuario>[0];
 
@@ -129,7 +133,7 @@ app.patch(
       }
       const updateInput: UsuarioUpdateInput & { hash_codigo_acceso?: string | null } = { ...body };
       if (body.codigo_acceso) {
-        updateInput.hash_codigo_acceso = await hash(body.codigo_acceso, 12);
+        updateInput.hash_codigo_acceso = hashSHA512(body.codigo_acceso);
       }
       const row = await updateUsuario(id, updateInput);
       if (!row) return c.json({ error: "Usuario no encontrado" }, 404);
