@@ -193,10 +193,16 @@ export async function createBeneficiarioWithAsignacion(
       RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
     `;
-    await reserved`
-      INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-      VALUES (${input.tecnico_id}, ${row.id}, ${userId})
+    const [existing] = await reserved`
+      SELECT id FROM asignaciones_beneficiario
+      WHERE tecnico_id = ${input.tecnico_id} AND beneficiario_id = ${row.id} AND activo = true
     `;
+    if (!existing) {
+      await reserved`
+        INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
+        VALUES (${input.tecnico_id}, ${row.id}, ${userId})
+      `;
+    }
     await reserved`COMMIT`;
     return row;
   } catch (err) {
