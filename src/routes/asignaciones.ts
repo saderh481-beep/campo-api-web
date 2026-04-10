@@ -86,8 +86,9 @@ app.post("/coordinador-tecnico", zValidator("json", z.object({ tecnico_id: z.str
 
 app.delete("/coordinador-tecnico/:tecnico_id", async (c) => {
   const { tecnico_id } = c.req.param();
-  if (!tecnico_id || tecnico_id === "undefined") {
-    return c.json({ error: "ID de técnico requerido" }, 400);
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!tecnico_id || !uuidRegex.test(tecnico_id)) {
+    return c.json({ error: "ID de técnico inválido o requerido" }, 400);
   }
   const row = await deleteAsignacionCoordinadorTecnico(tecnico_id);
   if (!row) return c.json({ error: "Asignación no encontrada" }, 404);
