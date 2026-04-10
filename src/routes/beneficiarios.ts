@@ -329,4 +329,156 @@ app.get(
   }
 );
 
+app.post(
+  "/:id/foto-rostro",
+  requireRole("admin", "coordinador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
+
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      const formData = await c.req.formData();
+      const archivo = formData.get("archivo") as File | null;
+      if (!archivo) return c.json({ error: "Archivo requerido" }, 400);
+
+      const result = await uploadBeneficiarioDocumentos(id, [archivo]);
+      const { url: secure_url } = result.documentos[0];
+
+      await sql`
+        UPDATE beneficiarios SET foto_rostro_url = ${secure_url}, updated_at = NOW()
+        WHERE id = ${id}
+      `;
+
+      return c.json({ url: secure_url });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al subir foto rostro:", e);
+      return c.json({ error: "Error al subir foto" }, 500);
+    }
+  }
+);
+
+app.get(
+  "/:id/foto-rostro",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
+
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      return c.json({ url: beneficiario.foto_rostro_url });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al obtener foto rostro:", e);
+      return c.json({ error: "Error al obtener foto" }, 500);
+    }
+  }
+);
+
+app.delete(
+  "/:id/foto-rostro",
+  requireRole("admin", "coordinador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
+
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      await sql`
+        UPDATE beneficiarios SET foto_rostro_url = null, updated_at = NOW()
+        WHERE id = ${id}
+      `;
+
+      return c.json({ message: "Foto eliminada" });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al eliminar foto rostro:", e);
+      return c.json({ error: "Error al eliminar foto" }, 500);
+    }
+  }
+);
+
+app.post(
+  "/:id/firma",
+  requireRole("admin", "coordinador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
+
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      const formData = await c.req.formData();
+      const archivo = formData.get("archivo") as File | null;
+      if (!archivo) return c.json({ error: "Archivo requerido" }, 400);
+
+      const result = await uploadBeneficiarioDocumentos(id, [archivo]);
+      const { url: secure_url } = result.documentos[0];
+
+      await sql`
+        UPDATE beneficiarios SET firma_url = ${secure_url}, updated_at = NOW()
+        WHERE id = ${id}
+      `;
+
+      return c.json({ url: secure_url });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al subir firma:", e);
+      return c.json({ error: "Error al subir firma" }, 500);
+    }
+  }
+);
+
+app.get(
+  "/:id/firma",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
+
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      return c.json({ url: beneficiario.firma_url });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al obtener firma:", e);
+      return c.json({ error: "Error al obtener firma" }, 500);
+    }
+  }
+);
+
+app.delete(
+  "/:id/firma",
+  requireRole("admin", "coordinador"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const { id } = c.req.valid("param");
+      const user = c.get("user");
+
+      const beneficiario = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      await sql`
+        UPDATE beneficiarios SET firma_url = null, updated_at = NOW()
+        WHERE id = ${id}
+      `;
+
+      return c.json({ message: "Firma eliminada" });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al eliminar firma:", e);
+      return c.json({ error: "Error al eliminar firma" }, 500);
+    }
+  }
+);
+
 export default app;

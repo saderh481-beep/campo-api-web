@@ -21,11 +21,13 @@ export interface Bitacora {
   foto_rostro_url: string | null;
   firma_url: string | null;
   fotos_campo: string[];
+  fotos_campo_urls?: string[];
   estado: BitacoraEstado;
   pdf_version: number;
   pdf_url_actual: string | null;
   pdf_original_url: string | null;
   pdf_edicion: Record<string, unknown>;
+  pdf_actividades_url: string | null;
   creada_offline: boolean;
   sync_id: string | null;
   created_at: Date;
