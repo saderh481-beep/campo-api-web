@@ -316,3 +316,27 @@ export async function deactivateBeneficiario(id: string) {
     reserved.release();
   }
 }
+
+export async function deleteBeneficiarioFisico(id: string) {
+  const reserved = await sql.reserve();
+  try {
+    await reserved`BEGIN`;
+    await reserved`DELETE FROM documentos WHERE beneficiario_id = ${id}`;
+    await reserved`DELETE FROM beneficiario_cadenas WHERE beneficiario_id = ${id}`;
+    await reserved`DELETE FROM bitacoras WHERE beneficiario_id = ${id}`;
+    await reserved`DELETE FROM asignaciones_actividad WHERE beneficiario_id = ${id}`;
+    await reserved`DELETE FROM asignaciones_beneficiario WHERE beneficiario_id = ${id}`;
+    const [row] = await reserved`
+      DELETE FROM beneficiarios
+      WHERE id = ${id}
+      RETURNING id, nombre, municipio
+    `;
+    await reserved`COMMIT`;
+    return row ?? null;
+  } catch (err) {
+    await reserved`ROLLBACK`;
+    throw err;
+  } finally {
+    reserved.release();
+  }
+}

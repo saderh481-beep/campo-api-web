@@ -16,6 +16,7 @@ import {
   createBeneficiarioWithAsignacion,
   updateBeneficiarioWithAsignacion,
   deactivateBeneficiario,
+  deleteBeneficiarioFisico,
   createBeneficiario,
   updateBeneficiario,
 } from "@/models/beneficiarios.model";
@@ -216,6 +217,27 @@ app.delete(
     } catch (e) {
       console.error("[Beneficiarios] Error al desactivar:", e);
       return c.json({ error: "Error al desactivar beneficiario" }, 500);
+    }
+  }
+);
+
+app.delete(
+  "/:id/force",
+  requireRole("admin"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    try {
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+
+      const beneficiario = await findBeneficiarioById(id);
+      if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
+      await deleteBeneficiarioFisico(id);
+      return c.json({ message: "Beneficiario eliminado" });
+    } catch (e) {
+      console.error("[Beneficiarios] Error al eliminar:", e);
+      return c.json({ error: "Error al eliminar beneficiario" }, 500);
     }
   }
 );
