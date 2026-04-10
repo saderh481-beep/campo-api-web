@@ -26,9 +26,19 @@ import type { AppEnv } from "@/types/http";
 const app = new Hono<AppEnv>();
 app.use("*", authMiddleware, requireRole("admin", "coordinador"));
 
-app.get("/coordinador-tecnico", zValidator("query", z.object({ tecnico_id: z.string().uuid().optional() })), async (c) => {
-  const { tecnico_id } = c.req.valid("query");
-  const rows = await listAsignacionesCoordinadorTecnico(tecnico_id);
+app.get("/coordinador-tecnico", async (c) => {
+  const user = c.get("user");
+  if (user.rol === "coordinador") {
+    const rows = await sql`
+      SELECT td.tecnico_id AS id, td.coordinador_id, td.fecha_limite, td.estado_corte, t.nombre AS tecnico_nombre, c.nombre AS coordinador_nombre
+      FROM tecnico_detalles td
+      JOIN usuarios t ON t.id = td.tecnico_id
+      LEFT JOIN usuarios c ON c.id = td.coordinador_id
+      WHERE td.coordinador_id = ${user.sub} AND td.activo = true
+    `;
+    return c.json(rows);
+  }
+  const rows = await listAsignacionesCoordinadorTecnico();
   return c.json(rows);
 });
 
