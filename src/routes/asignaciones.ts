@@ -26,7 +26,7 @@ import type { AppEnv } from "@/types/http";
 const app = new Hono<AppEnv>();
 app.use("*", authMiddleware, requireRole("admin", "coordinador"));
 
-app.get("/coordinador-tecnico", zValidator("query", z.object({ tecnico_id: z.string().uuid() })), async (c) => {
+app.get("/coordinador-tecnico", zValidator("query", z.object({ tecnico_id: z.string().uuid().optional() })), async (c) => {
   const { tecnico_id } = c.req.valid("query");
   const rows = await listAsignacionesCoordinadorTecnico(tecnico_id);
   return c.json(rows);
