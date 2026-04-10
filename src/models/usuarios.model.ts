@@ -96,6 +96,9 @@ export async function deleteUsuarioFisico(id: string) {
     DELETE FROM beneficiario_cadenas WHERE beneficiario_id IN (SELECT id FROM beneficiarios WHERE tecnico_id = ${id})
   `;
   await sql`
+    DELETE FROM bitacoras WHERE beneficiario_id IN (SELECT id FROM beneficiarios WHERE tecnico_id = ${id})
+  `;
+  await sql`
     DELETE FROM beneficiarios WHERE tecnico_id = ${id}
   `;
   const [row] = await sql`
