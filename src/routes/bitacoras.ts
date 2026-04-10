@@ -27,10 +27,11 @@ const app = new Hono<{
     user: JwtPayload;
   };
 }>();
-app.use("*", authMiddleware, requireRole("admin", "coordinador"));
+app.use("*", authMiddleware);
 
 app.get(
   "/",
+  requireRole("admin", "coordinador"),
   zValidator(
     "query",
     z.object({
@@ -51,6 +52,7 @@ app.get(
 
 app.get(
   "/:id",
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
     const user = c.get("user");
@@ -63,6 +65,7 @@ app.get(
 
 app.patch(
   "/:id",
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -89,6 +92,7 @@ app.patch(
 
 app.patch(
   "/:id/pdf-config",
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ pdf_edicion: z.record(z.string(), z.unknown()) })),
   async (c) => {
