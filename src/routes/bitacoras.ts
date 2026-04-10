@@ -107,6 +107,7 @@ app.patch(
 app.get(
   "/:id/pdf",
   zValidator("param", z.object({ id: z.string().uuid() })),
+  requireRole("admin", "coordinador", "tecnico"),
   async (c) => {
     const user = c.get("user");
     const { id } = c.req.valid("param");
@@ -127,6 +128,7 @@ app.get(
 app.get(
   "/:id/pdf/descargar",
   zValidator("param", z.object({ id: z.string().uuid() })),
+  requireRole("admin", "coordinador", "tecnico"),
   async (c) => {
     const user = c.get("user");
     const { id } = c.req.valid("param");
@@ -147,6 +149,7 @@ app.get(
 app.post(
   "/:id/pdf/imprimir",
   zValidator("param", z.object({ id: z.string().uuid() })),
+  requireRole("admin", "coordinador", "tecnico"),
   async (c) => {
     const user = c.get("user");
     const { id } = c.req.valid("param");
@@ -162,7 +165,7 @@ app.post(
     const nextVersion = await getNextPdfVersion(id);
 
     const publicId = `bitacoras/${bitacora.tecnico_id}/${new Date().getMonth() + 1}/bitacora-${id}-impresion-${Date.now()}`;
-    const upload = await subirPDF(publicId, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
+    const upload = await subirPDF(id, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
 
     await createPdfVersion({
       bitacoraId: id,

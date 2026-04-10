@@ -20,11 +20,16 @@ export async function findBitacoraByIdWithAccess(
   const [row] =
     rol === "admin"
       ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
-      : await sql`
-          SELECT b.* FROM bitacoras b
-          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${userId}
-        `;
+      : rol === "coordinador"
+        ? await sql`
+            SELECT b.* FROM bitacoras b
+            JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
+            WHERE b.id = ${id} AND td.coordinador_id = ${userId}
+          `
+        : await sql`
+            SELECT b.* FROM bitacoras b
+            WHERE b.id = ${id} AND b.tecnico_id = ${userId}
+          `;
   return (row ?? null) as unknown as Bitacora | null;
 }
 
