@@ -270,10 +270,16 @@ export async function updateBeneficiarioWithAsignacion(
         SET activo = false, removido_en = NOW()
         WHERE beneficiario_id = ${id} AND activo = true
       `;
-      await reserved`
-        INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-        VALUES (${nuevoTecnicoId}, ${id}, ${userId})
+      const [existing] = await reserved`
+        SELECT id FROM asignaciones_beneficiario
+        WHERE tecnico_id = ${nuevoTecnicoId} AND beneficiario_id = ${id} AND activo = true
       `;
+      if (!existing) {
+        await reserved`
+          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
+          VALUES (${nuevoTecnicoId}, ${id}, ${userId})
+        `;
+      }
     }
     await reserved`COMMIT`;
     return row ?? null;
