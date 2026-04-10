@@ -81,10 +81,21 @@ export async function getAsignacionBeneficiarioById(id: string) {
 }
 
 export async function createAsignacionBeneficiario(tecnicoId: string, beneficiarioId: string, asignadoPor: string) {
+  const [existing] = await sql`
+    SELECT id FROM asignaciones_beneficiario 
+    WHERE tecnico_id = ${tecnicoId} AND beneficiario_id = ${beneficiarioId}
+  `;
+  if (existing) {
+    const [row] = await sql`
+      UPDATE asignaciones_beneficiario SET activo = true, asignado_en = NOW()
+      WHERE tecnico_id = ${tecnicoId} AND beneficiario_id = ${beneficiarioId}
+      RETURNING id, tecnico_id, beneficiario_id, activo
+    `;
+    return row;
+  }
   const [row] = await sql`
     INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
     VALUES (${tecnicoId}, ${beneficiarioId}, ${asignadoPor})
-    ON CONFLICT (tecnico_id, beneficiario_id) DO UPDATE SET activo = true, asignado_en = NOW()
     RETURNING id, tecnico_id, beneficiario_id, activo
   `;
   return row;
@@ -95,8 +106,7 @@ export async function updateAsignacionBeneficiario(id: string, input: { tecnico_
     UPDATE asignaciones_beneficiario SET
       tecnico_id = COALESCE(${input.tecnico_id ?? null}, tecnico_id),
       beneficiario_id = COALESCE(${input.beneficiario_id ?? null}, beneficiario_id),
-      activo = COALESCE(${input.activo ?? null}, activo),
-      actualizado_en = NOW()
+      activo = COALESCE(${input.activo ?? null}, activo)
     WHERE id = ${id}
     RETURNING id, tecnico_id, beneficiario_id, activo
   `;
@@ -105,7 +115,7 @@ export async function updateAsignacionBeneficiario(id: string, input: { tecnico_
 
 export async function deleteAsignacionBeneficiario(id: string) {
   const [row] = await sql`
-    UPDATE asignaciones_beneficiario SET activo = false, actualizado_en = NOW()
+    UPDATE asignaciones_beneficiario SET activo = false
     WHERE id = ${id} AND activo = true
     RETURNING id
   `;
@@ -132,10 +142,21 @@ export async function getAsignacionActividadById(id: string) {
 }
 
 export async function createAsignacionActividad(tecnicoId: string, actividadId: string, asignadoPor: string) {
+  const [existing] = await sql`
+    SELECT id FROM asignaciones_actividad 
+    WHERE tecnico_id = ${tecnicoId} AND actividad_id = ${actividadId}
+  `;
+  if (existing) {
+    const [row] = await sql`
+      UPDATE asignaciones_actividad SET activo = true, asignado_en = NOW()
+      WHERE tecnico_id = ${tecnicoId} AND actividad_id = ${actividadId}
+      RETURNING id, tecnico_id, actividad_id, activo
+    `;
+    return row;
+  }
   const [row] = await sql`
     INSERT INTO asignaciones_actividad (tecnico_id, actividad_id, asignado_por)
     VALUES (${tecnicoId}, ${actividadId}, ${asignadoPor})
-    ON CONFLICT (tecnico_id, actividad_id) DO UPDATE SET activo = true, asignado_en = NOW()
     RETURNING id, tecnico_id, actividad_id, activo
   `;
   return row;
@@ -146,8 +167,7 @@ export async function updateAsignacionActividad(id: string, input: { tecnico_id?
     UPDATE asignaciones_actividad SET
       tecnico_id = COALESCE(${input.tecnico_id ?? null}, tecnico_id),
       actividad_id = COALESCE(${input.actividad_id ?? null}, actividad_id),
-      activo = COALESCE(${input.activo ?? null}, activo),
-      actualizado_en = NOW()
+      activo = COALESCE(${input.activo ?? null}, activo)
     WHERE id = ${id}
     RETURNING id, tecnico_id, actividad_id, activo
   `;
@@ -156,7 +176,7 @@ export async function updateAsignacionActividad(id: string, input: { tecnico_id?
 
 export async function deleteAsignacionActividad(id: string) {
   const [row] = await sql`
-    UPDATE asignaciones_actividad SET activo = false, actualizado_en = NOW()
+    UPDATE asignaciones_actividad SET activo = false
     WHERE id = ${id} AND activo = true
     RETURNING id
   `;
