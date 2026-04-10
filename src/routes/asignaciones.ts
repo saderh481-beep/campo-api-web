@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
+import { existsTecnicoActivoWithCoordinador } from "@/models/beneficiarios.model";
 import {
   createAsignacionActividad,
   createAsignacionBeneficiario,
@@ -22,7 +24,7 @@ import {
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("admin"));
+app.use("*", authMiddleware, requireRole("admin", "coordinador"));
 
 app.get("/coordinador-tecnico", zValidator("query", z.object({ tecnico_id: z.string().uuid() })), async (c) => {
   const { tecnico_id } = c.req.valid("query");
@@ -30,9 +32,19 @@ app.get("/coordinador-tecnico", zValidator("query", z.object({ tecnico_id: z.str
   return c.json(rows);
 });
 
-app.get("/coordinador-tecnico/lista", zValidator("query", z.object({ tecnico_id: z.string().uuid().optional() })), async (c) => {
-  const { tecnico_id } = c.req.valid("query");
-  const rows = await listAsignacionesCoordinadorTecnico(tecnico_id);
+app.get("/coordinador-tecnico/lista", async (c) => {
+  const user = c.get("user");
+  if (user.rol === "coordinador") {
+    const rows = await sql`
+      SELECT td.tecnico_id AS id, td.coordinador_id, td.fecha_limite, td.estado_corte, t.nombre AS tecnico_nombre, c.nombre AS coordinador_nombre
+      FROM tecnico_detalles td
+      JOIN usuarios t ON t.id = td.tecnico_id
+      LEFT JOIN usuarios c ON c.id = td.coordinador_id
+      WHERE td.coordinador_id = ${user.sub} AND td.activo = true
+    `;
+    return c.json(rows);
+  }
+  const rows = await listAsignacionesCoordinadorTecnico();
   return c.json(rows);
 });
 
@@ -46,6 +58,10 @@ app.get("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ tecni
 app.post("/coordinador-tecnico", zValidator("json", z.object({ tecnico_id: z.string().uuid(), coordinador_id: z.string().uuid(), fecha_limite: z.string().min(1) })), async (c) => {
   try {
     const body = c.req.valid("json");
+    const user = c.get("user");
+    if (user.rol === "coordinador" && body.coordinador_id !== user.sub) {
+      return c.json({ error: "Solo puede asignar técnicos a su propio coordinador" }, 403);
+    }
     const fecha = new Date(body.fecha_limite);
     if (isNaN(fecha.getTime())) {
       return c.json({ error: "fecha_limite debe ser una fecha válida" }, 400);
@@ -103,6 +119,12 @@ app.post("/beneficiario", zValidator("json", z.object({ tecnico_id: z.string().u
   try {
     const body = c.req.valid("json");
     const user = c.get("user");
+    if (user.rol === "coordinador") {
+      const tieneAcceso = await existsTecnicoActivoWithCoordinador(body.tecnico_id, user.sub);
+      if (!tieneAcceso) {
+        return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+      }
+    }
     const row = await createAsignacionBeneficiario(body.tecnico_id, body.beneficiario_id, user.sub);
     return c.json(row, 201);
   } catch (e) {
@@ -143,6 +165,12 @@ app.post("/actividad", zValidator("json", z.object({ tecnico_id: z.string().uuid
   try {
     const body = c.req.valid("json");
     const user = c.get("user");
+    if (user.rol === "coordinador") {
+      const tieneAcceso = await existsTecnicoActivoWithCoordinador(body.tecnico_id, user.sub);
+      if (!tieneAcceso) {
+        return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+      }
+    }
     const row = await createAsignacionActividad(body.tecnico_id, body.actividad_id, user.sub);
     return c.json(row, 201);
   } catch (e) {
