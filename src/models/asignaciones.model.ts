@@ -116,7 +116,7 @@ export async function updateAsignacionBeneficiario(id: string, input: { tecnico_
 export async function deleteAsignacionBeneficiario(id: string) {
   const [row] = await sql`
     UPDATE asignaciones_beneficiario SET activo = false
-    WHERE id = ${id} AND activo = true
+    WHERE id = ${id}
     RETURNING id
   `;
   return row ?? null;
@@ -177,7 +177,7 @@ export async function updateAsignacionActividad(id: string, input: { tecnico_id?
 export async function deleteAsignacionActividad(id: string) {
   const [row] = await sql`
     UPDATE asignaciones_actividad SET activo = false
-    WHERE id = ${id} AND activo = true
+    WHERE id = ${id}
     RETURNING id
   `;
   return row ?? null;
