@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts, JPEGFitting } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { fetch } from "undici";
 
 export interface PdfConfig {
@@ -29,6 +29,19 @@ async function embedImage(pdfDoc: PDFDocument, imageUrl: string): Promise<any | 
   } catch {
     return null;
   }
+}
+
+function calculateFit(originalWidth: number, originalHeight: number, maxWidth: number, maxHeight: number): { width: number; height: number } {
+  const aspectRatio = originalWidth / originalHeight;
+  let newWidth = maxWidth;
+  let newHeight = newWidth / aspectRatio;
+
+  if (newHeight > maxHeight) {
+    newHeight = maxHeight;
+    newWidth = newHeight * aspectRatio;
+  }
+
+  return { width: Math.round(newWidth), height: Math.round(newHeight) };
 }
 
 export async function generarPdfBitacora(
@@ -103,14 +116,12 @@ export async function generarPdfBitacora(
   if (fotoRostroUrl) {
     const fotoRostro = await embedImage(pdfDoc, fotoRostroUrl);
     if (fotoRostro) {
-      const imgWidth = 100;
-      const imgHeight = Math.min((fotoRostro.height / fotoRostro.width) * imgWidth, 100);
+      const { width: imgWidth, height: imgHeight } = calculateFit(fotoRostro.width, fotoRostro.height, 100, 100);
       page.drawImage(fotoRostro, {
         x: margin,
         y: y - imgHeight,
         width: imgWidth,
         height: imgHeight,
-        fit: JPEGFitting.FILL,
       });
       y -= imgHeight + 15;
     }
@@ -128,14 +139,12 @@ export async function generarPdfBitacora(
   if (firmaUrl) {
     const firma = await embedImage(pdfDoc, firmaUrl);
     if (firma) {
-      const imgWidth = 150;
-      const imgHeight = Math.min((firma.height / firma.width) * imgWidth, 60);
+      const { width: imgWidth, height: imgHeight } = calculateFit(firma.width, firma.height, 150, 60);
       page.drawImage(firma, {
         x: margin,
         y: y - imgHeight,
         width: imgWidth,
         height: imgHeight,
-        fit: JPEGFitting.FILL,
       });
       y -= imgHeight + 15;
     }
@@ -159,9 +168,7 @@ export async function generarPdfBitacora(
       if (count >= 4) break;
       const foto = await embedImage(pdfDoc, fotoUrl);
       if (foto) {
-        const aspect = foto.height / foto.width;
-        const w = imgSize;
-        const h = imgSize * aspect;
+        const { width: w, height: h } = calculateFit(foto.width, foto.height, imgSize, imgSize);
 
         if (xImg + w > width - margin) {
           xImg = margin;
@@ -177,7 +184,6 @@ export async function generarPdfBitacora(
           y: y - h,
           width: w,
           height: h,
-          fit: JPEGFitting.FILL,
         });
 
         xImg += w + 10;
