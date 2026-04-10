@@ -166,7 +166,7 @@ export async function createPdfVersion(params: {
 }): Promise<void> {
   await sql`
     INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
-    VALUES (${params.bitacoraId}, ${params.version}, ${params.r2Key}, ${params.sha256}, ${params.inmutable}, ${params.generadoPor})
+    VALUES (${params.bitacoraId}, ${params.version}, ${params.r2Key}, ${params.sha256}, ${params.inmutable ? 1 : 0}, ${params.generadoPor})
   `;
 }
 
