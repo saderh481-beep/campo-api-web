@@ -89,6 +89,9 @@ export async function deleteUsuarioFisico(id: string) {
   await sql`
     DELETE FROM asignaciones_actividad WHERE tecnico_id = ${id}
   `;
+  await sql`
+    DELETE FROM asignaciones_beneficiario WHERE tecnico_id = ${id}
+  `;
   const [row] = await sql`
     DELETE FROM usuarios
     WHERE id = ${id}
