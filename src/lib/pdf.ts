@@ -1,9 +1,34 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, JPEGFitting } from "pdf-lib";
+import { fetch } from "undici";
 
 export interface PdfConfig {
   encabezado?: string;
   telefono?: string;
   direccion?: string;
+}
+
+async function loadImageFromUrl(url: string): Promise<Uint8Array | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+async function embedImage(pdfDoc: PDFDocument, imageUrl: string): Promise<any | null> {
+  const imageData = await loadImageFromUrl(imageUrl);
+  if (!imageData) return null;
+  try {
+    if (imageUrl.toLowerCase().includes(".jpg") || imageUrl.toLowerCase().includes(".jpeg")) {
+      return await pdfDoc.embedJpg(imageData);
+    }
+    return await pdfDoc.embedPng(imageData);
+  } catch {
+    return null;
+  }
 }
 
 export async function generarPdfBitacora(
@@ -65,14 +90,129 @@ export async function generarPdfBitacora(
     y -= 12;
   }
 
+  if (y < 150) {
+    pdfDoc.addPage();
+    y = height - margin;
+  }
+
   y -= 30;
-  page.drawText(`Fecha de generación: ${new Date().toLocaleString()}`, {
-    x: margin,
-    y,
-    size: fontSize - 2,
-    font,
-    color: rgb(0.5, 0.5, 0.5),
-  });
+  page.drawText("Foto del Rostro:", { x: margin, y, size: fontSize, font: boldFont });
+  y -= 15;
+
+  const fotoRostroUrl = bitacora.foto_rostro_url as string | undefined;
+  if (fotoRostroUrl) {
+    const fotoRostro = await embedImage(pdfDoc, fotoRostroUrl);
+    if (fotoRostro) {
+      const imgWidth = 100;
+      const imgHeight = Math.min((fotoRostro.height / fotoRostro.width) * imgWidth, 100);
+      page.drawImage(fotoRostro, {
+        x: margin,
+        y: y - imgHeight,
+        width: imgWidth,
+        height: imgHeight,
+        fit: JPEGFitting.FILL,
+      });
+      y -= imgHeight + 15;
+    }
+  }
+
+  if (y < 150) {
+    pdfDoc.addPage();
+    y = height - margin;
+  }
+
+  page.drawText("Firma:", { x: margin, y, size: fontSize, font: boldFont });
+  y -= 15;
+
+  const firmaUrl = bitacora.firma_url as string | undefined;
+  if (firmaUrl) {
+    const firma = await embedImage(pdfDoc, firmaUrl);
+    if (firma) {
+      const imgWidth = 150;
+      const imgHeight = Math.min((firma.height / firma.width) * imgWidth, 60);
+      page.drawImage(firma, {
+        x: margin,
+        y: y - imgHeight,
+        width: imgWidth,
+        height: imgHeight,
+        fit: JPEGFitting.FILL,
+      });
+      y -= imgHeight + 15;
+    }
+  }
+
+  if (y < 150) {
+    pdfDoc.addPage();
+    y = height - margin;
+  }
+
+  page.drawText("Fotos de Campo:", { x: margin, y, size: fontSize, font: boldFont });
+  y -= 15;
+
+  const fotosCampo = bitacora.fotos_campo as string[] | undefined;
+  if (fotosCampo && fotosCampo.length > 0) {
+    let xImg = margin;
+    const imgSize = 80;
+    let count = 0;
+
+    for (const fotoUrl of fotosCampo) {
+      if (count >= 4) break;
+      const foto = await embedImage(pdfDoc, fotoUrl);
+      if (foto) {
+        const aspect = foto.height / foto.width;
+        const w = imgSize;
+        const h = imgSize * aspect;
+
+        if (xImg + w > width - margin) {
+          xImg = margin;
+          y -= imgSize + 10;
+          if (y < 150) {
+            pdfDoc.addPage();
+            y = height - margin;
+          }
+        }
+
+        page.drawImage(foto, {
+          x: xImg,
+          y: y - h,
+          width: w,
+          height: h,
+          fit: JPEGFitting.FILL,
+        });
+
+        xImg += w + 10;
+        count++;
+      }
+    }
+  }
+
+  for (let i = pdfDoc.getPageCount() - 1; i >= 0; i--) {
+    const p = pdfDoc.getPage(i);
+    const pHeight = p.getSize().height;
+    const marginP = 50;
+    let yP = pHeight - marginP;
+
+    if (i > 0) continue;
+
+    p.drawText(`Fecha de generación: ${new Date().toLocaleString()}`, {
+      x: marginP,
+      y: yP - 20,
+      size: fontSize - 2,
+      font,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+
+    const pdfActividadesUrl = bitacora.pdf_actividades_url as string | undefined;
+    if (pdfActividadesUrl) {
+      p.drawText(`PDF de Actividades: ${pdfActividadesUrl}`, {
+        x: marginP,
+        y: yP - 40,
+        size: fontSize - 2,
+        font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+    }
+  }
 
   return pdfDoc.save();
 }
