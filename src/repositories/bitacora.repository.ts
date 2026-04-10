@@ -176,3 +176,59 @@ export async function getPdfConfig(): Promise<Record<string, unknown>> {
   `;
   return (row?.valor ?? {}) as Record<string, unknown>;
 }
+
+export async function updateBitacoraFotoRostro(
+  id: string,
+  fotoRostroUrl: string
+): Promise<Bitacora | null> {
+  const [row] = await sql`
+    UPDATE bitacoras SET
+      foto_rostro_url = ${fotoRostroUrl},
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id, foto_rostro_url, updated_at
+  `;
+  return (row ?? null) as unknown as Bitacora | null;
+}
+
+export async function updateBitacoraFirma(
+  id: string,
+  firmaUrl: string
+): Promise<Bitacora | null> {
+  const [row] = await sql`
+    UPDATE bitacoras SET
+      firma_url = ${firmaUrl},
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id, firma_url, updated_at
+  `;
+  return (row ?? null) as unknown as Bitacora | null;
+}
+
+export async function updateBitacoraFotosCampo(
+  id: string,
+  fotosCampo: string[]
+): Promise<Bitacora | null> {
+  const [row] = await sql`
+    UPDATE bitacoras SET
+      fotos_campo = ${JSON.stringify(fotosCampo)}::jsonb,
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id, fotos_campo, updated_at
+  `;
+  return (row ?? null) as unknown as Bitacora | null;
+}
+
+export async function updateBitacoraPdfActividades(
+  id: string,
+  pdfUrl: string
+): Promise<Bitacora | null> {
+  const [row] = await sql`
+    UPDATE bitacoras SET
+      pdf_actividades_url = ${pdfUrl},
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id, pdf_actividades_url, updated_at
+  `;
+  return (row ?? null) as unknown as Bitacora | null;
+}

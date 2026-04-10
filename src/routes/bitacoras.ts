@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { sql } from "@/db";
-import { subirPDF } from "@/lib/campo-files";
+import { subirPDF, subirFotoRostro, subirFirma, eliminarArchivo } from "@/lib/campo-files";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { generarPdfBitacora } from "@/lib/pdf";
 import type { PdfConfig } from "@/lib/pdf";
@@ -20,6 +20,10 @@ import {
   getNextPdfVersion,
   createPdfVersion,
   getPdfConfig,
+  updateBitacoraFotoRostro,
+  updateBitacoraFirma,
+  updateBitacoraFotosCampo,
+  updateBitacoraPdfActividades,
 } from "@/repositories/bitacora.repository";
 
 const app = new Hono<{
@@ -197,6 +201,200 @@ app.get(
 
     const versiones = await findPdfVersionesByBitacoraId(id);
     return c.json(versiones);
+  }
+);
+
+app.post(
+  "/:id/foto-rostro",
+  requireRole("admin", "coordinador", "tecnico"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    const formData = await c.req.formData();
+    const archivo = formData.get("archivo") as File | null;
+    if (!archivo) return c.json({ error: "Archivo requerido" }, 400);
+
+    const buffer = Buffer.from(await archivo.arrayBuffer());
+    const result = await subirFotoRostro(id, buffer, archivo.name);
+
+    await updateBitacoraFotoRostro(id, result.url);
+    return c.json({ url: result.url, thumbnail: result.thumbnail });
+  }
+);
+
+app.get(
+  "/:id/foto-rostro",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    return c.json({ url: bitacora.foto_rostro_url });
+  }
+);
+
+app.post(
+  "/:id/firma",
+  requireRole("admin", "coordinador", "tecnico"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    const formData = await c.req.formData();
+    const archivo = formData.get("archivo") as File | null;
+    if (!archivo) return c.json({ error: "Archivo requerido" }, 400);
+
+    const buffer = Buffer.from(await archivo.arrayBuffer());
+    const result = await subirFirma(id, buffer, archivo.name);
+
+    await updateBitacoraFirma(id, result.url);
+    return c.json({ url: result.url });
+  }
+);
+
+app.get(
+  "/:id/firma",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    return c.json({ url: bitacora.firma_url });
+  }
+);
+
+app.post(
+  "/:id/fotos-campo",
+  requireRole("admin", "coordinador", "tecnico"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    const formData = await c.req.formData();
+    const archivos = formData.getAll("archivos") as File[];
+    if (archivos.length === 0) return c.json({ error: "Archivos requeridos" }, 400);
+
+    const fotosCampo = (bitacora.fotos_campo as unknown as string[]) || [];
+    const urls: string[] = [];
+
+    for (const archivo of archivos) {
+      const buffer = Buffer.from(await archivo.arrayBuffer());
+      const result = await subirPDF(id, buffer, archivo.name);
+      fotosCampo.push(result.url);
+      urls.push(result.url);
+    }
+
+    await updateBitacoraFotosCampo(id, fotosCampo);
+    return c.json({ urls });
+  }
+);
+
+app.get(
+  "/:id/fotos-campo",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    return c.json({ fotos: bitacora.fotos_campo });
+  }
+);
+
+app.delete(
+  "/:id/fotos-campo/:idx",
+  requireRole("admin", "coordinador", "tecnico"),
+  zValidator("param", z.object({ id: z.string().uuid(), idx: z.coerce.number().int().min(0) })),
+  async (c) => {
+    const user = c.get("user");
+    const { id, idx } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    const fotosCampo = (bitacora.fotos_campo as unknown as string[]) || [];
+    if (idx >= fotosCampo.length) return c.json({ error: "Índice no válido" }, 400);
+
+    const urlEliminada = fotosCampo[idx];
+    fotosCampo.splice(idx, 1);
+
+    await updateBitacoraFotosCampo(id, fotosCampo);
+    return c.json({ message: "Foto eliminada", url: urlEliminada });
+  }
+);
+
+app.post(
+  "/:id/pdf-actividades",
+  requireRole("admin", "coordinador", "tecnico"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    const formData = await c.req.formData();
+    const archivo = formData.get("archivo") as File | null;
+    if (!archivo) return c.json({ error: "Archivo PDF requerido" }, 400);
+
+    const buffer = Buffer.from(await archivo.arrayBuffer());
+    const filename = `bitacora-${id}-actividades-${Date.now()}.pdf`;
+    const result = await subirPDF(id, buffer, filename);
+
+    await updateBitacoraPdfActividades(id, result.url);
+    return c.json({ url: result.url });
+  }
+);
+
+app.get(
+  "/:id/pdf-actividades",
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    return c.json({ url: bitacora.pdf_actividades_url });
+  }
+);
+
+app.delete(
+  "/:id/pdf-actividades",
+  requireRole("admin", "coordinador", "tecnico"),
+  zValidator("param", z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.valid("param");
+
+    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
+
+    await updateBitacoraPdfActividades(id, "");
+    return c.json({ message: "PDF de actividades eliminado" });
   }
 );
 
