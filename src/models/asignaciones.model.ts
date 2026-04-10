@@ -55,7 +55,7 @@ export async function updateAsignacionCoordinadorTecnico(tecnicoId: string, inpu
 export async function deleteAsignacionCoordinadorTecnico(tecnicoId: string) {
   const [row] = await sql`
     UPDATE tecnico_detalles SET activo = false, updated_at = NOW()
-    WHERE tecnico_id = ${tecnicoId} AND activo = true
+    WHERE tecnico_id = ${tecnicoId}
     RETURNING tecnico_id
   `;
   return row ?? null;
