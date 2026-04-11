@@ -1,5 +1,10 @@
 export type BitacoraEstado = "borrador" | "cerrada";
 
+export interface FotoCampoItem {
+  url: string;
+  label: string;
+}
+
 export interface Bitacora {
   id: string;
   tipo: string;
@@ -21,7 +26,7 @@ export interface Bitacora {
   foto_rostro_url: string | null;
   firma_url: string | null;
   fotos_campo: string[];
-  fotos_campo_urls?: string[];
+  fotos_campo_urls: FotoCampoItem[];
   estado: BitacoraEstado;
   pdf_version: number;
   pdf_url_actual: string | null;

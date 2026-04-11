@@ -63,7 +63,20 @@ app.get(
     const { id } = c.req.valid("param");
     const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
-    return c.json(bitacora);
+
+    const fotosCampoUrls = (bitacora.fotos_campo as string[] || []).map((url, idx) => ({
+      url,
+      label: `foto${idx + 1}`,
+    }));
+
+    return c.json({
+      ...bitacora,
+      foto_rostro_url: bitacora.foto_rostro_url || null,
+      firma_url: bitacora.firma_url || null,
+      fotos_campo: bitacora.fotos_campo || [],
+      fotos_campo_urls: fotosCampoUrls,
+      pdf_actividades_url: bitacora.pdf_actividades_url || null,
+    });
   }
 );
 
@@ -237,7 +250,7 @@ app.get(
     const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    return c.json({ url: bitacora.foto_rostro_url });
+    return c.json({ url: bitacora.foto_rostro_url || "" });
   }
 );
 
@@ -318,7 +331,12 @@ app.get(
     const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    return c.json({ fotos: bitacora.fotos_campo });
+    const fotos = (bitacora.fotos_campo as string[] || []).map((url, idx) => ({
+      url,
+      label: `foto${idx + 1}`,
+    }));
+
+    return c.json({ fotos });
   }
 );
 
