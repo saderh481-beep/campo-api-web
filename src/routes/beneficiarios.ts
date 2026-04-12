@@ -100,8 +100,9 @@ app.post(
   async (c) => {
     try {
       const body = c.req.valid("json");
+      console.log("[Beneficiarios] POST body received:", JSON.stringify(body));
       const user = c.get("user");
-      console.log("[Beneficiarios] POST body:", JSON.stringify(body));
+      console.log("[Beneficiarios] User:", user.sub, user.rol);
 
       const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
       console.log("[Beneficiarios] técnico válido:", tecnicoValido);
@@ -132,7 +133,8 @@ app.post(
       return c.json(nuevo, 201);
     } catch (e) {
       console.error("[Beneficiarios] Error al crear:", e);
-      return c.json({ error: "Error al crear beneficiario" }, 500);
+      const message = e instanceof Error ? e.message : String(e);
+      return c.json({ error: "Error al crear beneficiario", detail: message }, 500);
     }
   }
 );
