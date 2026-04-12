@@ -87,6 +87,7 @@ app.post(
     z.object({
       nombre: z.string().min(2),
       municipio: z.string().min(1),
+      curp: z.string().optional(),
       localidad: z.string().optional(),
       localidad_id: z.string().uuid().optional(),
       direccion: z.string().optional(),
@@ -94,7 +95,7 @@ app.post(
       telefono_principal: z.string().optional(),
       telefono_secundario: z.string().optional(),
       coord_parcela: z.string().optional(),
-      tecnico_id: z.string().uuid(),
+      tecnico_id: z.string().uuid().optional(),
     })
   ),
   async (c) => {
@@ -104,10 +105,13 @@ app.post(
       const user = c.get("user");
       console.log("[Beneficiarios] User:", user.sub, user.rol);
 
-      const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
+      const tecnicoId = body.tecnico_id || "c8ad06ed-c493-48f4-89c0-15fb800a3469";
+      console.log("[Beneficiarios] Using tecnico_id:", tecnicoId);
+
+      const tecnicoValido = await existsTecnicoActivo(tecnicoId);
       console.log("[Beneficiarios] técnico válido:", tecnicoValido);
       if (!tecnicoValido) {
-        console.log("[Beneficiarios] ERROR: Técnico no encontrado o inactivo:", body.tecnico_id);
+        console.log("[Beneficiarios] ERROR: Técnico no encontrado o inactivo:", tecnicoId);
         return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
       }
 
@@ -121,12 +125,12 @@ app.post(
       }
       
       if (user.rol === "coordinador") {
-        const tieneAcceso = await existsTecnicoActivoWithCoordinador(body.tecnico_id, user.sub);
+        const tieneAcceso = await existsTecnicoActivoWithCoordinador(tecnicoId, user.sub);
         if (!tieneAcceso) return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
       }
 
       const nuevo = await createBeneficiarioWithAsignacion(
-        { ...body, coordParcela: coordParcela },
+        { ...body, tecnico_id: tecnicoId, coordParcela: coordParcela },
         user.sub
       );
       if (!nuevo) return c.json({ error: "Error al crear beneficiario" }, 500);
