@@ -101,18 +101,23 @@ app.post(
     try {
       const body = c.req.valid("json");
       const user = c.get("user");
-      const coordParcela = normalizePoint(body.coord_parcela);
+      console.log("[Beneficiarios] POST body:", JSON.stringify(body));
 
-      if (body.coord_parcela && !coordParcela) {
-        return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+      const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
+      console.log("[Beneficiarios] técnico válido:", tecnicoValido);
+      if (!tecnicoValido) {
+        console.log("[Beneficiarios] ERROR: Técnico no encontrado o inactivo:", body.tecnico_id);
+        return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
       }
 
       if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
         return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
       }
 
-      const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
-      if (!tecnicoValido) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
+      const coordParcela = normalizePoint(body.coord_parcela);
+      if (body.coord_parcela && !coordParcela) {
+        return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
+      }
       
       if (user.rol === "coordinador") {
         const tieneAcceso = await existsTecnicoActivoWithCoordinador(body.tecnico_id, user.sub);
