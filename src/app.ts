@@ -70,6 +70,18 @@ app.get("/api/v1/health", async (c) => {
   return c.json({ service: "api-web", version: "v1", ...health }, statusCode);
 });
 
+app.post("/debug/fix-sha256", async (c) => {
+  try {
+    await sql`ALTER TABLE pdf_versiones ALTER COLUMN sha256 TYPE CHAR(64)`;
+    await sql`ALTER TABLE documentos ALTER COLUMN sha256 TYPE CHAR(64)`;
+    await sql`ALTER TABLE documentos_pdf ALTER COLUMN sha256 TYPE CHAR(64)`;
+    return c.json({ ok: true, message: "Columns fixed" });
+  } catch (err) {
+    console.error("Migration error:", err);
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
 app.route("/api/v1", v1Routes);
 
 app.notFound((c) => c.json({ error: "Ruta no encontrada" }, 404));

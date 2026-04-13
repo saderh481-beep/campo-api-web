@@ -21,29 +21,35 @@ export async function findBitacoraByIdWithAccess(
     rol === "admin"
       ? await sql`
           SELECT b.*, 
+                 t.nombre AS tecnico_nombre,
                  be.nombre AS beneficiario_nombre,
                  be.municipio AS beneficiario_municipio,
                  be.localidad AS beneficiario_localidad
           FROM bitacoras b
+          LEFT JOIN usuarios t ON t.id = b.tecnico_id
           LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
           WHERE b.id = ${id}`
       : rol === "coordinador"
         ? await sql`
             SELECT b.*, 
+                   t.nombre AS tecnico_nombre,
                    be.nombre AS beneficiario_nombre,
                    be.municipio AS beneficiario_municipio,
                    be.localidad AS beneficiario_localidad
             FROM bitacoras b
+            LEFT JOIN usuarios t ON t.id = b.tecnico_id
             LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
             JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
             WHERE b.id = ${id} AND td.coordinador_id = ${userId}
           `
         : await sql`
             SELECT b.*, 
+                   t.nombre AS tecnico_nombre,
                    be.nombre AS beneficiario_nombre,
                    be.municipio AS beneficiario_municipio,
                    be.localidad AS beneficiario_localidad
             FROM bitacoras b
+            LEFT JOIN usuarios t ON t.id = b.tecnico_id
             LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
             WHERE b.id = ${id} AND b.tecnico_id = ${userId}
           `;
