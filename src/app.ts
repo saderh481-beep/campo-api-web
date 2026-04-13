@@ -12,10 +12,23 @@ const app = new Hono();
 app.use("*", logger());
 app.use("*", secureHeaders());
 
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://web-campo-campo-saas.up.railway.app",
+  "https://campo-web-campo-saas.up.railway.app",
+];
+
 app.use(
   "*",
   cors({
-    origin: "*",
+    origin: (origin) => {
+      if (!origin) return "*";
+      if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".up.railway.app")) {
+        return origin;
+      }
+      return ALLOWED_ORIGINS[0] || "*";
+    },
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
