@@ -244,12 +244,11 @@ export async function generarPdfBitacora(
     color: COLOR_BLANCO,
   });
 
-  y -= 15;
-  const benefFields = [
+y -= 15;
+  const beneficiarioFields = [
     { label: "Nombre:", value: String(bitacora.beneficiario_nombre ?? "-") },
     { label: "Municipio:", value: String(bitacora.beneficiario_municipio ?? "-") },
     { label: "Localidad:", value: String(bitacora.beneficiario_localidad ?? "-") },
-    { label: "Clave:", value: String(bitacora.beneficiario_clave ?? "-") },
   ];
 
   for (const field of benefFields) {
