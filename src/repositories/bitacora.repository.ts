@@ -16,21 +16,41 @@ export async function findBitacoraByIdWithAccess(
   id: string,
   userId: string,
   rol: string
-): Promise<Bitacora | null> {
+): Promise<Record<string, unknown> | null> {
   const [row] =
     rol === "admin"
-      ? await sql`SELECT * FROM bitacoras WHERE id = ${id}`
+      ? await sql`
+          SELECT b.*, 
+                 be.nombre AS beneficiario_nombre,
+                 be.municipio AS beneficiario_municipio,
+                 be.localidad AS beneficiario_localidad,
+                 be.clave AS beneficiario_clave
+          FROM bitacoras b
+          LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
+          WHERE b.id = ${id}`
       : rol === "coordinador"
         ? await sql`
-            SELECT b.* FROM bitacoras b
+            SELECT b.*, 
+                   be.nombre AS beneficiario_nombre,
+                   be.municipio AS beneficiario_municipio,
+                   be.localidad AS beneficiario_localidad,
+                   be.clave AS beneficiario_clave
+            FROM bitacoras b
+            LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
             JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
             WHERE b.id = ${id} AND td.coordinador_id = ${userId}
           `
         : await sql`
-            SELECT b.* FROM bitacoras b
+            SELECT b.*, 
+                   be.nombre AS beneficiario_nombre,
+                   be.municipio AS beneficiario_municipio,
+                   be.localidad AS beneficiario_localidad,
+                   be.clave AS beneficiario_clave
+            FROM bitacoras b
+            LEFT JOIN beneficiarios be ON be.id = b.beneficiario_id
             WHERE b.id = ${id} AND b.tecnico_id = ${userId}
           `;
-  return (row ?? null) as unknown as Bitacora | null;
+  return (row ?? null) as Record<string, unknown> | null;
 }
 
 export async function findAllBitacoras(
