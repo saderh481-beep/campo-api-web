@@ -512,10 +512,16 @@ y -= 15;
   const fotoRostroUrl = bitacora.foto_rostro_url as string | undefined;
   const firmaUrl = bitacora.firma_url as string | undefined;
   const fotosCampo = bitacora.fotos_campo as string[] | undefined;
-  const tieneFotos = fotoRostroUrl || firmaUrl || (fotosCampo && fotosCampo.length > 0);
-
-  if (tieneFotos) {
-    y -= 30;
+  
+  let fotoIndex = 0;
+  const maxFotosPagina = 6;
+  
+  if (fotoRostroUrl || firmaUrl || (fotosCampo && fotosCampo.length > 0)) {
+    if (y < 250) {
+      pdfDoc.addPage();
+      y = height - margin;
+    }
+    y -= 15;
     page.drawRectangle({
       x: margin,
       y: y - 5,
@@ -533,73 +539,83 @@ y -= 15;
     y -= 30;
   }
 
-  if (fotoRostroUrl) {
+  if (fotoRostroUrl && fotoIndex < maxFotosPagina) {
     const fotoRostro = await embedImage(pdfDoc, fotoRostroUrl);
     if (fotoRostro) {
-      const { width: imgWidth, height: imgHeight } = calculateFit(fotoRostro.width, fotoRostro.height, 100, 80);
+      const { width: imgWidth, height: imgHeight } = calculateFit(fotoRostro.width, fotoRostro.height, 90, 70);
+      const xPos = margin;
+      
+      if (y < imgHeight + 50) {
+        pdfDoc.addPage();
+        y = height - margin;
+      }
       
       page.drawRectangle({
-        x: margin,
-        y: y - imgHeight - 20,
-        width: imgWidth + 10,
-        height: imgHeight + 25,
+        x: xPos,
+        y: y - imgHeight - 15,
+        width: imgWidth + 6,
+        height: imgHeight + 22,
         borderColor: COLOR_VINO,
         borderWidth: 2,
         color: COLOR_BLANCO,
       });
       page.drawImage(fotoRostro, {
-        x: margin + 5,
-        y: y - imgHeight - 15,
+        x: xPos + 3,
+        y: y - imgHeight - 12,
         width: imgWidth,
         height: imgHeight,
       });
-      page.drawText("Foto del Beneficiario", {
-        x: margin + 5,
-        y: y - imgHeight - 30,
-        size: fontSize,
+      page.drawText("Foto Beneficiario", {
+        x: xPos + 3,
+        y: y - imgHeight - 27,
+        size: fontSize - 1,
         font: boldFont,
         color: COLOR_VINO_OSCURO,
       });
-      y -= imgHeight + 40;
+      fotoIndex++;
     }
   }
 
-  if (firmaUrl && y > 180) {
+  if (firmaUrl && fotoIndex < maxFotosPagina && y > 150) {
     const firma = await embedImage(pdfDoc, firmaUrl);
     if (firma) {
-      const { width: imgWidth, height: imgHeight } = calculateFit(firma.width, firma.height, 150, 50);
-      if (y < imgHeight + 60) {
+      const { width: imgWidth, height: imgHeight } = calculateFit(firma.width, firma.height, 120, 45);
+      const xPos = margin + 160;
+      
+      if (y < imgHeight + 50) {
         pdfDoc.addPage();
         y = height - margin;
       }
+      
       page.drawRectangle({
-        x: margin,
-        y: y - imgHeight - 20,
-        width: imgWidth + 10,
-        height: imgHeight + 25,
+        x: xPos,
+        y: y - imgHeight - 15,
+        width: imgWidth + 6,
+        height: imgHeight + 22,
         borderColor: COLOR_VINO,
         borderWidth: 2,
         color: COLOR_BLANCO,
       });
       page.drawImage(firma, {
-        x: margin + 5,
-        y: y - imgHeight - 15,
+        x: xPos + 3,
+        y: y - imgHeight - 12,
         width: imgWidth,
         height: imgHeight,
       });
-      page.drawText("Firma del Beneficiario", {
-        x: margin + 5,
-        y: y - imgHeight - 30,
-        size: fontSize,
+      page.drawText("Firma", {
+        x: xPos + 3,
+        y: y - imgHeight - 27,
+        size: fontSize - 1,
         font: boldFont,
         color: COLOR_VINO_OSCURO,
       });
-      y -= imgHeight + 40;
+      fotoIndex++;
+      y -= 80;
     }
   }
 
-  if (fotosCampo && fotosCampo.length > 0 && y > 180) {
-    y -= 10;
+  if (fotosCampo && fotosCampo.length > 0) {
+    y -= 20;
     page.drawText("Fotos de Campo", {
       x: margin,
       y,
@@ -609,22 +625,30 @@ y -= 15;
     });
     y -= 20;
 
-    const imgSize = 65;
+    const imgSize = 55;
     let xImg = margin;
     let count = 0;
+    const fotosPorLinea = 4;
 
     for (const fotoUrl of fotosCampo) {
-      if (count >= 4) break;
+      if (count >= 8) break;
       const foto = await embedImage(pdfDoc, fotoUrl);
       if (foto) {
         const { width: w, height: h } = calculateFit(foto.width, foto.height, imgSize, imgSize);
 
-        if (xImg + w > width - margin) {
+        if (xImg + w > width - margin - 10) {
           xImg = margin;
-          y -= imgSize + 10;
-          if (y < 180) {
+          y -= imgSize + 15;
+          if (y < 150) {
             pdfDoc.addPage();
-            y = height - margin;
+            y = height - margin - 30;
+            page.drawRectangle({
+              x: margin,
+              y: height - margin - 5,
+              width: contentWidth,
+              height: 3,
+              color: COLOR_VINO_OSCURO,
+            });
           }
         }
 
@@ -633,7 +657,7 @@ y -= 15;
           y: y - h - 2,
           width: w + 4,
           height: h + 4,
-          borderColor: COLOR_GRIS_MEDIO,
+          borderColor: COLOR_VINO,
           borderWidth: 1,
           color: COLOR_BLANCO,
         });
@@ -644,8 +668,12 @@ y -= 15;
           height: h,
         });
 
-        xImg += w + 10;
+        xImg += w + 8;
         count++;
+        if (count % fotosPorLinea === 0) {
+          xImg = margin;
+          y -= imgSize + 15;
+        }
       }
     }
   }
