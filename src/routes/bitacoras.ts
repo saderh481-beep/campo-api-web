@@ -132,11 +132,24 @@ app.get(
   async (c) => {
     const user = c.get("user");
     const { id } = c.req.valid("param");
-    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    
+    let bitacora;
+    try {
+      bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    } catch (err) {
+      console.error("ErrorDB1:", err);
+      return c.json({ error: "ErrorDB1: " + String(err) }, 500);
+    }
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
     try {
-      const pdfConfig = await getPdfConfig();
+      let pdfConfig;
+      try {
+        pdfConfig = await getPdfConfig();
+      } catch (err) {
+        console.error("ErrorDB2:", err);
+        return c.json({ error: "ErrorDB2: " + String(err) }, 500);
+      }
       const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
       return new Response(Buffer.from(pdfBytes), {
         headers: {
@@ -146,7 +159,7 @@ app.get(
       });
     } catch (err) {
       console.error("Error generando PDF:", err);
-      return c.json({ error: "Error al generar el PDF" }, 500);
+      return c.json({ error: "ErrorPDF: " + String(err) }, 500);
     }
   }
 );
@@ -158,11 +171,24 @@ app.get(
   async (c) => {
     const user = c.get("user");
     const { id } = c.req.valid("param");
-    const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    
+    let bitacora;
+    try {
+      bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
+    } catch (err) {
+      console.error("ErrorDB1:", err);
+      return c.json({ error: "ErrorDB1: " + String(err) }, 500);
+    }
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
     try {
-      const pdfConfig = await getPdfConfig();
+      let pdfConfig;
+      try {
+        pdfConfig = await getPdfConfig();
+      } catch (err) {
+        console.error("ErrorDB2:", err);
+        return c.json({ error: "ErrorDB2: " + String(err) }, 500);
+      }
       const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
       return new Response(Buffer.from(pdfBytes), {
         headers: {
@@ -172,7 +198,7 @@ app.get(
       });
     } catch (err) {
       console.error("Error generando PDF:", err);
-      return c.json({ error: "Error al generar el PDF" }, 500);
+      return c.json({ error: "ErrorPDF: " + String(err) }, 500);
     }
   }
 );
