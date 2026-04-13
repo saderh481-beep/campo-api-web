@@ -179,6 +179,7 @@ app.get(
 
 app.post(
   "/:id/pdf/imprimir",
+  zValidator("param", z.object({ id: z.string().uuid() })),
   requireRole("admin", "coordinador"),
   async (c) => {
     const user = c.get("user");
