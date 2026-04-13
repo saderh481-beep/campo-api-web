@@ -251,7 +251,7 @@ y -= 15;
     { label: "Localidad:", value: String(bitacora.beneficiario_localidad ?? "-") },
   ];
 
-  for (const field of benefFields) {
+  for (const field of beneficiarioFields) {
     page.drawText(field.label, {
       x: margin + 10,
       y,
