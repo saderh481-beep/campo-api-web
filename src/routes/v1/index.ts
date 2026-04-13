@@ -27,6 +27,7 @@ v1.route("/administradores", administradoresRoutes);
 v1.route("/coordinadores", coordinadoresRoutes);
 v1.route("/tecnicos", tecnicosRoutes);
 v1.route("/cadenas-productivas", cadenasRoutes);
+v1.route("/cadenas", cadenasRoutes);
 v1.route("/actividades", actividadesRoutes);
 v1.route("/beneficiarios", beneficiariosRoutes);
 v1.route("/asignaciones", asignacionesRoutes);

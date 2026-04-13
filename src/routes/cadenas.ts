@@ -6,15 +6,16 @@ import { createCadena, deactivateCadena, listCadenas, updateCadena, type CadenaI
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("admin"));
+app.use("*", authMiddleware);
 
-app.get("/", async (c) => {
+app.get("/", requireRole("admin", "coordinador"), async (c) => {
   const rows = await listCadenas();
   return c.json(rows);
 });
 
 app.post(
   "/",
+  requireRole("admin"),
   zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
   async (c) => {
     const user = c.get("user");
@@ -26,6 +27,7 @@ app.post(
 
 app.patch(
   "/:id",
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional() })),
   async (c) => {
@@ -39,6 +41,7 @@ app.patch(
 
 app.delete(
   "/:id",
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
     const { id } = c.req.param();
