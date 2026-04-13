@@ -69,6 +69,10 @@ export async function findAllBitacoras(
     condiciones.push(`td.coordinador_id = $${i++}`);
     params.push(userId);
   }
+  if (rol === "tecnico") {
+    condiciones.push(`b.tecnico_id = $${i++}`);
+    params.push(userId);
+  }
   if (filtros.tecnico_id) {
     condiciones.push(`b.tecnico_id = $${i++}`);
     params.push(filtros.tecnico_id);

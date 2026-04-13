@@ -66,6 +66,17 @@ export async function listBeneficiariosByUser(userId: string, rol: string) {
     `;
   }
 
+  if (rol === "tecnico") {
+    return await sql`
+      SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
+             b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
+             b.coord_parcela, b.activo, b.created_at, b.updated_at
+      FROM beneficiarios b
+      WHERE b.tecnico_id = ${userId} AND b.activo = true
+      ORDER BY b.nombre
+    `;
+  }
+
   return await sql`
     SELECT b.id, b.tecnico_id, b.nombre, b.municipio, b.localidad, b.localidad_id,
            b.direccion, b.cp, b.telefono_principal, b.telefono_secundario,
@@ -93,12 +104,14 @@ export async function findBeneficiarioByIdWithAccess(id: string, userId: string,
   const [row] =
     rol === "admin"
       ? await sql`SELECT * FROM beneficiarios WHERE id = ${id} AND activo = true`
-      : await sql`
-          SELECT b.*
-          FROM beneficiarios b
-          JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
-          WHERE b.id = ${id} AND td.coordinador_id = ${userId} AND b.activo = true
-        `;
+      : rol === "tecnico"
+        ? await sql`SELECT b.* FROM beneficiarios b WHERE b.id = ${id} AND b.tecnico_id = ${userId} AND b.activo = true`
+        : await sql`
+            SELECT b.*
+            FROM beneficiarios b
+            JOIN tecnico_detalles td ON td.tecnico_id = b.tecnico_id AND td.activo = true
+            WHERE b.id = ${id} AND td.coordinador_id = ${userId} AND b.activo = true
+          `;
   return row ?? null;
 }
 

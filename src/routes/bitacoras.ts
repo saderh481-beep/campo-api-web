@@ -35,7 +35,7 @@ app.use("*", authMiddleware);
 
 app.get(
   "/",
-  requireRole("admin", "coordinador"),
+  requireRole("admin", "coordinador", "tecnico"),
   zValidator(
     "query",
     z.object({
@@ -56,7 +56,7 @@ app.get(
 
 app.get(
   "/:id",
-  requireRole("admin", "coordinador"),
+  requireRole("admin", "coordinador", "tecnico"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
     const user = c.get("user");
