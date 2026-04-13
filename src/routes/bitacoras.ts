@@ -135,14 +135,19 @@ app.get(
     const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    const pdfConfig = await getPdfConfig();
-    const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
-    return new Response(Buffer.from(pdfBytes), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="bitacora-${id}.pdf"`,
-      },
-    });
+    try {
+      const pdfConfig = await getPdfConfig();
+      const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
+      return new Response(Buffer.from(pdfBytes), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="bitacora-${id}.pdf"`,
+        },
+      });
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      return c.json({ error: "Error al generar el PDF" }, 500);
+    }
   }
 );
 
@@ -156,14 +161,19 @@ app.get(
     const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    const pdfConfig = await getPdfConfig();
-    const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
-    return new Response(Buffer.from(pdfBytes), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="bitacora-${id}.pdf"`,
-      },
-    });
+    try {
+      const pdfConfig = await getPdfConfig();
+      const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
+      return new Response(Buffer.from(pdfBytes), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="bitacora-${id}.pdf"`,
+        },
+      });
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      return c.json({ error: "Error al generar el PDF" }, 500);
+    }
   }
 );
 
@@ -177,29 +187,34 @@ app.post(
     const bitacora = await findBitacoraByIdWithAccess(id, user.sub, user.rol);
     if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
 
-    const pdfConfig = await getPdfConfig();
-    const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, { impresion: true }, pdfConfig as PdfConfig);
+    try {
+      const pdfConfig = await getPdfConfig();
+      const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, { impresion: true }, pdfConfig as PdfConfig);
 
-    const buffer = Buffer.from(pdfBytes);
-    const sha256 = createHash("sha256").update(buffer).digest("hex");
+      const buffer = Buffer.from(pdfBytes);
+      const sha256 = createHash("sha256").update(buffer).digest("hex");
 
-    const nextVersion = await getNextPdfVersion(id);
+      const nextVersion = await getNextPdfVersion(id);
 
-    const publicId = `bitacoras/${bitacora.tecnico_id}/${new Date().getMonth() + 1}/bitacora-${id}-impresion-${Date.now()}`;
-    const upload = await subirPDF(id, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
+      const publicId = `bitacoras/${bitacora.tecnico_id}/${new Date().getMonth() + 1}/bitacora-${id}-impresion-${Date.now()}`;
+      const upload = await subirPDF(id, buffer, `bitacora-${id}-impresion-${Date.now()}.pdf`);
 
-    await createPdfVersion({
-      bitacoraId: id,
-      version: nextVersion,
-      r2Key: upload.url,
-      sha256,
-      inmutable: false,
-      generadoPor: user.sub,
-    });
+      await createPdfVersion({
+        bitacoraId: id,
+        version: nextVersion,
+        r2Key: upload.url,
+        sha256,
+        inmutable: false,
+        generadoPor: user.sub,
+      });
 
-    return new Response(Buffer.from(pdfBytes), {
-      headers: { "Content-Type": "application/pdf" },
-    });
+      return new Response(Buffer.from(pdfBytes), {
+        headers: { "Content-Type": "application/pdf" },
+      });
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      return c.json({ error: "Error al generar el PDF" }, 500);
+    }
   }
 );
 
