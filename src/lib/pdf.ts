@@ -8,11 +8,14 @@ export interface PdfConfig {
   pie_pagina?: string | null;
 }
 
-const COLOR_VERDE_INSTITUCIONAL = rgb(0 / 255, 102 / 255, 51 / 255);
+const COLOR_VINO_OSCURO = rgb(75 / 255, 0 / 255, 30 / 255);
+const COLOR_VINO = rgb(114 / 255, 9 / 255, 47 / 255);
+const COLOR_VINO_CLARO = rgb(155 / 255, 52 / 255, 87 / 255);
 const COLOR_BLANCO = rgb(1, 1, 1);
-const COLOR_GRIS_OSCURO = rgb(0.2, 0.2, 0.2);
-const COLOR_GRIS_CLARO = rgb(0.6, 0.6, 0.6);
-const COLOR_GRIS_MUY_CLARO = rgb(0.9, 0.9, 0.9);
+const COLOR_GRIS_OSCURO = rgb(0.15, 0.15, 0.15);
+const COLOR_GRIS_MEDIO = rgb(0.4, 0.4, 0.4);
+const COLOR_GRIS_CLARO = rgb(0.7, 0.7, 0.7);
+const COLOR_GRIS_MUY_CLARO = rgb(0.95, 0.95, 0.95);
 
 async function loadImageFromUrl(url: string): Promise<Uint8Array | null> {
   if (!url) return null;
@@ -93,7 +96,7 @@ export async function generarPdfBitacora(
     y: height - margin - logoHeight - 8,
     width: contentWidth,
     height: 3,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
 
   const institution = (config.institucion as string) || "SECRETARÍA DE DESARROLLO AGROPECUARIO";
@@ -105,7 +108,7 @@ export async function generarPdfBitacora(
     y: headerY,
     size: titleSize,
     font: boldFont,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
 
   headerY -= 16;
@@ -144,7 +147,7 @@ export async function generarPdfBitacora(
     y,
     size: titleSize + 2,
     font: boldFont,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
 
   const folioOrId = bitacora.folio as string || bitacora.id as string || "";
@@ -166,7 +169,7 @@ export async function generarPdfBitacora(
     y: y - 5,
     width: contentWidth,
     height: 25,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
   page.drawText("DATOS DE LA VISITA", {
     x: margin + 10,
@@ -184,7 +187,7 @@ export async function generarPdfBitacora(
     y: y - 80,
     width: contentWidth,
     height: 85,
-    borderColor: COLOR_GRIS_CLARO,
+    borderColor: COLOR_GRIS_MEDIO,
     borderWidth: 1,
     color: COLOR_BLANCO,
   });
@@ -204,7 +207,7 @@ export async function generarPdfBitacora(
       y,
       size: fontSize,
       font: boldFont,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText(field.value, {
       x: xPos + 90,
@@ -223,7 +226,7 @@ export async function generarPdfBitacora(
     y: y - 5,
     width: contentWidth,
     height: 25,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
   page.drawText("DATOS DEL BENEFICIARIO", {
     x: margin + 10,
@@ -239,7 +242,7 @@ export async function generarPdfBitacora(
     y: y - 85,
     width: contentWidth,
     height: 90,
-    borderColor: COLOR_GRIS_CLARO,
+    borderColor: COLOR_GRIS_MEDIO,
     borderWidth: 1,
     color: COLOR_BLANCO,
   });
@@ -257,7 +260,7 @@ y -= 15;
       y,
       size: fontSize,
       font: boldFont,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText(field.value, {
       x: margin + 100,
@@ -276,7 +279,7 @@ y -= 15;
     y: y - 5,
     width: contentWidth,
     height: 25,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
   page.drawText("DATOS DEL TÉCNICO", {
     x: margin + 10,
@@ -292,7 +295,7 @@ y -= 15;
     y: y - 35,
     width: contentWidth,
     height: 40,
-    borderColor: COLOR_GRIS_CLARO,
+    borderColor: COLOR_GRIS_MEDIO,
     borderWidth: 1,
     color: COLOR_BLANCO,
   });
@@ -303,7 +306,7 @@ y -= 15;
     y,
     size: fontSize,
     font: boldFont,
-    color: COLOR_VERDE_INSTITUCIONAL,
+    color: COLOR_VINO_OSCURO,
   });
   page.drawText(String(bitacora.tecnico_nombre ?? "-"), {
     x: margin + 100,
@@ -323,7 +326,7 @@ y -= 15;
       y: y - 5,
       width: contentWidth,
       height: 25,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText("OBSERVACIONES DEL COORDINADOR", {
       x: margin + 10,
@@ -340,7 +343,7 @@ y -= 15;
       y: y - obsHeight + 5,
       width: contentWidth,
       height: obsHeight,
-      borderColor: COLOR_GRIS_CLARO,
+      borderColor: COLOR_GRIS_MEDIO,
       borderWidth: 1,
       color: COLOR_BLANCO,
     });
@@ -371,7 +374,7 @@ y -= 15;
       y: y - 5,
       width: contentWidth,
       height: 25,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText("ACTIVIDADES REALIZADAS", {
       x: margin + 10,
@@ -388,7 +391,7 @@ y -= 15;
       y: y - actHeight + 5,
       width: contentWidth,
       height: actHeight,
-      borderColor: COLOR_GRIS_CLARO,
+      borderColor: COLOR_GRIS_MEDIO,
       borderWidth: 1,
       color: COLOR_BLANCO,
     });
@@ -420,7 +423,7 @@ y -= 15;
       y: y - 5,
       width: contentWidth,
       height: 25,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText("RECOMENDACIONES / EVALUACIÓN", {
       x: margin + 10,
@@ -437,7 +440,7 @@ y -= 15;
       y: y - recHeight + 5,
       width: contentWidth,
       height: recHeight,
-      borderColor: COLOR_GRIS_CLARO,
+      borderColor: COLOR_GRIS_MEDIO,
       borderWidth: 1,
       color: COLOR_BLANCO,
     });
@@ -470,7 +473,7 @@ y -= 15;
       y: y - 5,
       width: contentWidth,
       height: 25,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText("COMENTARIOS DEL BENEFICIARIO", {
       x: margin + 10,
@@ -487,7 +490,7 @@ y -= 15;
       y: y - comHeight + 5,
       width: contentWidth,
       height: comHeight,
-      borderColor: COLOR_GRIS_CLARO,
+      borderColor: COLOR_GRIS_MEDIO,
       borderWidth: 1,
       color: COLOR_BLANCO,
     });
@@ -518,7 +521,7 @@ y -= 15;
       y: y - 5,
       width: contentWidth,
       height: 25,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     page.drawText("EVIDENCIA FOTOGRÁFICA", {
       x: margin + 10,
@@ -540,8 +543,8 @@ y -= 15;
         y: y - imgHeight - 20,
         width: imgWidth + 10,
         height: imgHeight + 25,
-        borderColor: COLOR_GRIS_CLARO,
-        borderWidth: 1,
+        borderColor: COLOR_VINO,
+        borderWidth: 2,
         color: COLOR_BLANCO,
       });
       page.drawImage(fotoRostro, {
@@ -553,9 +556,9 @@ y -= 15;
       page.drawText("Foto del Beneficiario", {
         x: margin + 5,
         y: y - imgHeight - 30,
-        size: fontSize - 1,
+        size: fontSize,
         font: boldFont,
-        color: COLOR_GRIS_OSCURO,
+        color: COLOR_VINO_OSCURO,
       });
       y -= imgHeight + 40;
     }
@@ -574,8 +577,8 @@ y -= 15;
         y: y - imgHeight - 20,
         width: imgWidth + 10,
         height: imgHeight + 25,
-        borderColor: COLOR_GRIS_CLARO,
-        borderWidth: 1,
+        borderColor: COLOR_VINO,
+        borderWidth: 2,
         color: COLOR_BLANCO,
       });
       page.drawImage(firma, {
@@ -587,9 +590,9 @@ y -= 15;
       page.drawText("Firma del Beneficiario", {
         x: margin + 5,
         y: y - imgHeight - 30,
-        size: fontSize - 1,
+        size: fontSize,
         font: boldFont,
-        color: COLOR_GRIS_OSCURO,
+        color: COLOR_VINO_OSCURO,
       });
       y -= imgHeight + 40;
     }
@@ -602,7 +605,7 @@ y -= 15;
       y,
       size: sectionSize - 1,
       font: boldFont,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
     y -= 20;
 
@@ -630,7 +633,7 @@ y -= 15;
           y: y - h - 2,
           width: w + 4,
           height: h + 4,
-          borderColor: COLOR_GRIS_CLARO,
+          borderColor: COLOR_GRIS_MEDIO,
           borderWidth: 1,
           color: COLOR_BLANCO,
         });
@@ -657,7 +660,7 @@ y -= 15;
       y: footY - 10,
       width: contentWidth,
       height: 2,
-      color: COLOR_VERDE_INSTITUCIONAL,
+      color: COLOR_VINO_OSCURO,
     });
 
     p.drawText(`Fecha de generación: ${new Date().toLocaleString("es-MX", {
@@ -671,7 +674,7 @@ y -= 15;
       y: footY - 25,
       size: fontSize - 2,
       font,
-      color: COLOR_GRIS_CLARO,
+      color: COLOR_GRIS_MEDIO,
     });
 
     const piePagina = config.pie_pagina as string | null;
@@ -681,7 +684,7 @@ y -= 15;
         y: footY - 40,
         size: fontSize - 3,
         font,
-        color: COLOR_GRIS_CLARO,
+        color: COLOR_GRIS_MEDIO,
       });
     }
   }
