@@ -151,10 +151,12 @@ app.get(
         return c.json({ error: "ErrorDB2: " + String(err) }, 500);
       }
       const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
+      const origin = c.req.header("Origin") || "*";
       return new Response(Buffer.from(pdfBytes), {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename="bitacora-${id}.pdf"`,
+          "Access-Control-Allow-Origin": origin,
         },
       });
     } catch (err) {
@@ -190,10 +192,12 @@ app.get(
         return c.json({ error: "ErrorDB2: " + String(err) }, 500);
       }
       const pdfBytes = await generarPdfBitacora(bitacora as unknown as Record<string, unknown>, {}, pdfConfig as PdfConfig);
+      const origin = c.req.header("Origin") || "*";
       return new Response(Buffer.from(pdfBytes), {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `attachment; filename="bitacora-${id}.pdf"`,
+          "Access-Control-Allow-Origin": origin,
         },
       });
     } catch (err) {
@@ -234,8 +238,12 @@ app.post(
         generadoPor: user.sub,
       });
 
+      const origin = c.req.header("Origin") || "*";
       return new Response(Buffer.from(pdfBytes), {
-        headers: { "Content-Type": "application/pdf" },
+        headers: { 
+          "Content-Type": "application/pdf",
+          "Access-Control-Allow-Origin": origin,
+        },
       });
     } catch (err) {
       console.error("Error generando PDF:", err);
