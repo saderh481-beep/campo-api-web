@@ -2,10 +2,17 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { fetch } from "undici";
 
 export interface PdfConfig {
-  encabezado?: string;
-  telefono?: string;
-  direccion?: string;
+  institucion?: string | null;
+  dependencia?: string | null;
+  logo_url?: string | null;
+  pie_pagina?: string | null;
 }
+
+const COLOR_VERDE_INSTITUCIONAL = rgb(0 / 255, 102 / 255, 51 / 255);
+const COLOR_BLANCO = rgb(1, 1, 1);
+const COLOR_GRIS_OSCURO = rgb(0.2, 0.2, 0.2);
+const COLOR_GRIS_CLARO = rgb(0.6, 0.6, 0.6);
+const COLOR_GRIS_MUY_CLARO = rgb(0.9, 0.9, 0.9);
 
 async function loadImageFromUrl(url: string): Promise<Uint8Array | null> {
   if (!url) return null;
@@ -57,111 +64,381 @@ export async function generarPdfBitacora(
   const { width, height } = page.getSize();
 
   const fontSize = 10;
-  const boldSize = 12;
-  const margin = 50;
-  let y = height - margin;
+  const titleSize = 14;
+  const sectionSize = 11;
+  const margin = 40;
+  const contentWidth = width - (margin * 2);
 
-  page.drawText("Bitácora de Visita", {
+  const logoUrl = config.logo_url as string | undefined;
+  let logoHeight = 0;
+  let logoWidth = 0;
+
+  if (logoUrl) {
+    const logoImg = await embedImage(pdfDoc, logoUrl);
+    if (logoImg) {
+      const logoDims = calculateFit(logoImg.width, logoImg.height, 120, 40);
+      logoWidth = logoDims.width;
+      logoHeight = logoDims.height;
+      page.drawImage(logoImg, {
+        x: margin,
+        y: height - margin - logoHeight,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    }
+  }
+
+  page.drawRectangle({
+    x: margin,
+    y: height - margin - logoHeight - 8,
+    width: contentWidth,
+    height: 3,
+    color: COLOR_VERDE_INSTITUCIONAL,
+  });
+
+  const institution = (config.institucion as string) || "SECRETARÍA DE DESARROLLO AGROPECUARIO";
+  const dependencia = config.dependencia as string | null;
+
+  let headerY = height - margin - logoHeight - 20;
+  page.drawText(institution.toUpperCase(), {
+    x: logoUrl ? margin + logoWidth + 15 : margin,
+    y: headerY,
+    size: titleSize,
+    font: boldFont,
+    color: COLOR_VERDE_INSTITUCIONAL,
+  });
+
+  headerY -= 16;
+  if (dependencia) {
+    page.drawText(dependencia.toUpperCase(), {
+      x: logoUrl ? margin + logoWidth + 15 : margin,
+      y: headerY,
+      size: fontSize,
+      font: boldFont,
+      color: COLOR_GRIS_OSCURO,
+    });
+    headerY -= 14;
+  }
+
+  page.drawText("PRIMERO EL PUEBLO", {
+    x: logoUrl ? margin + logoWidth + 15 : margin,
+    y: headerY,
+    size: fontSize + 2,
+    font: boldFont,
+    color: COLOR_GRIS_OSCURO,
+  });
+
+  let y = height - margin - logoHeight - 60;
+
+  page.drawRectangle({
+    x: margin,
+    y: y - 5,
+    width: contentWidth,
+    height: 2,
+    color: COLOR_GRIS_MUY_CLARO,
+  });
+
+  y -= 25;
+  page.drawText("BITÁCORA DE VISITA", {
     x: margin,
     y,
-    size: boldSize,
+    size: titleSize + 2,
     font: boldFont,
+    color: COLOR_VERDE_INSTITUCIONAL,
   });
-  y -= 20;
 
-  const fields = [
-    ["Tipo:", String(bitacora.tipo ?? "-")],
-    ["Estado:", String(bitacora.estado ?? "-")],
-    ["Fecha Inicio:", String(bitacora.fecha_inicio ?? "-")],
-    ["Fecha Fin:", String(bitacora.fecha_fin ?? "-")],
-    ["Beneficiario:", String(bitacora.beneficiario_nombre ?? "-")],
-    ["Técnico:", String(bitacora.tecnico_nombre ?? "-")],
-  ];
-
-  for (const [label, value] of fields) {
-    page.drawText(`${label} ${value}`, { x: margin, y, size: fontSize, font });
-    y -= 15;
-  }
-
-  y -= 10;
-  page.drawText("Observaciones del Coordinador:", { x: margin, y, size: fontSize, font: boldFont });
-  y -= 15;
-  const obs = String(bitacora.observaciones_coordinador ?? "Sin observaciones");
-  const obsLines = obs.split("\n");
-  for (const line of obsLines) {
-    page.drawText(line, { x: margin, y, size: fontSize, font });
-    y -= 12;
-  }
-
-  y -= 20;
-  page.drawText("Actividades Realizadas:", { x: margin, y, size: fontSize, font: boldFont });
-  y -= 15;
-  const acts = String(bitacora.actividades_desc ?? "Sin descripción");
-  const actLines = acts.split("\n");
-  for (const line of actLines) {
-    page.drawText(line, { x: margin, y, size: fontSize, font });
-    y -= 12;
-  }
-
-  if (y < 150) {
-    pdfDoc.addPage();
-    y = height - margin;
+  const folioOrId = bitacora.folio as string || bitacora.id as string || "";
+  if (folioOrId) {
+    const folioWidth = boldFont.widthOfTextAtSize(`Folio: ${folioOrId}`, fontSize);
+    page.drawText(`Folio: ${folioOrId}`, {
+      x: width - margin - folioWidth,
+      y,
+      size: fontSize,
+      font: boldFont,
+      color: COLOR_GRIS_OSCURO,
+    });
   }
 
   y -= 30;
-  page.drawText("Foto del Rostro:", { x: margin, y, size: fontSize, font: boldFont });
-  y -= 15;
+
+  page.drawRectangle({
+    x: margin,
+    y: y,
+    width: contentWidth,
+    height: 130,
+    borderColor: COLOR_GRIS_CLARO,
+    borderWidth: 1,
+    color: COLOR_BLANCO,
+  });
+
+  y -= 10;
+  const fields = [
+    { label: "Tipo de Visita:", value: String(bitacora.tipo ?? "-") },
+    { label: "Estado:", value: String(bitacora.estado ?? "-") },
+    { label: "Fecha de Inicio:", value: String(bitacora.fecha_inicio ?? "-") },
+    { label: "Fecha de Fin:", value: String(bitacora.fecha_fin ?? "-") },
+  ];
+
+  for (const field of fields) {
+    page.drawText(field.label, {
+      x: margin + 10,
+      y,
+      size: fontSize,
+      font: boldFont,
+      color: COLOR_VERDE_INSTITUCIONAL,
+    });
+    page.drawText(field.value, {
+      x: margin + 100,
+      y,
+      size: fontSize,
+      font,
+      color: COLOR_GRIS_OSCURO,
+    });
+    y -= 16;
+  }
+
+  y -= 5;
+  page.drawLine({
+    start: { x: margin + 10, y: y },
+    end: { x: width - margin - 10, y: y },
+    thickness: 1,
+    color: COLOR_GRIS_MUY_CLARO,
+  });
+  y -= 18;
+
+  page.drawText("Beneficiario:", {
+    x: margin + 10,
+    y,
+    size: fontSize,
+    font: boldFont,
+    color: COLOR_VERDE_INSTITUCIONAL,
+  });
+  page.drawText(String(bitacora.beneficiario_nombre ?? "-"), {
+    x: margin + 100,
+    y,
+    size: fontSize,
+    font,
+    color: COLOR_GRIS_OSCURO,
+  });
+
+  const beneficiarioMunicipio = bitacora.beneficiario_municipio as string | undefined;
+  if (beneficiarioMunicipio) {
+    y -= 16;
+    page.drawText("Municipio:", {
+      x: margin + 10,
+      y,
+      size: fontSize,
+      font: boldFont,
+      color: COLOR_VERDE_INSTITUCIONAL,
+    });
+    page.drawText(beneficiarioMunicipio, {
+      x: margin + 100,
+      y,
+      size: fontSize,
+      font,
+      color: COLOR_GRIS_OSCURO,
+    });
+  }
+
+  y -= 30;
+  page.drawText("Técnico:", {
+    x: margin + 10,
+    y,
+    size: fontSize,
+    font: boldFont,
+    color: COLOR_VERDE_INSTITUCIONAL,
+  });
+  page.drawText(String(bitacora.tecnico_nombre ?? "-"), {
+    x: margin + 100,
+    y,
+    size: fontSize,
+    font,
+    color: COLOR_GRIS_OSCURO,
+  });
+
+  y -= 35;
+
+  page.drawRectangle({
+    x: margin,
+    y: y,
+    width: contentWidth,
+    height: 100,
+    borderColor: COLOR_GRIS_CLARO,
+    borderWidth: 1,
+    color: COLOR_BLANCO,
+  });
+
+  y -= 5;
+  page.drawText("OBSERVACIONES DEL COORDINADOR", {
+    x: margin + 10,
+    y,
+    size: sectionSize,
+    font: boldFont,
+    color: COLOR_VERDE_INSTITUCIONAL,
+  });
+
+  const obs = String(bitacora.observaciones_coordinador ?? "Sin observaciones");
+  const obsLines = obs.split("\n");
+  y -= 18;
+  for (const line of obsLines) {
+    page.drawText(line || " ", {
+      x: margin + 10,
+      y,
+      size: fontSize,
+      font,
+      color: COLOR_GRIS_OSCURO,
+    });
+    y -= 14;
+  }
+
+  y -= 25;
+
+  const acts = String(bitacora.actividades_desc ?? "Sin descripción");
+  const actLines = acts.split("\n");
+  let hasActividades = false;
+  for (const line of actLines) {
+    if (line.trim()) {
+      hasActividades = true;
+      break;
+    }
+  }
+
+  if (hasActividades) {
+    page.drawRectangle({
+      x: margin,
+      y: y,
+      width: contentWidth,
+      height: 100,
+      borderColor: COLOR_GRIS_CLARO,
+      borderWidth: 1,
+      color: COLOR_BLANCO,
+    });
+
+    y -= 5;
+    page.drawText("ACTIVIDADES REALIZADAS", {
+      x: margin + 10,
+      y,
+      size: sectionSize,
+      font: boldFont,
+      color: COLOR_VERDE_INSTITUCIONAL,
+    });
+
+    y -= 18;
+    for (const line of actLines) {
+      if (line.trim()) {
+        page.drawText(line, {
+          x: margin + 10,
+          y,
+          size: fontSize,
+          font,
+          color: COLOR_GRIS_OSCURO,
+        });
+        y -= 14;
+      }
+    }
+  }
+
+  if (y < 200) {
+    pdfDoc.addPage();
+    y = height - margin;
+  } else {
+    y -= 30;
+  }
 
   const fotoRostroUrl = bitacora.foto_rostro_url as string | undefined;
+  const firmaUrl = bitacora.firma_url as string | undefined;
+  const fotosCampo = bitacora.fotos_campo as string[] | undefined;
+
+  const tieneFotos = fotoRostroUrl || firmaUrl || (fotosCampo && fotosCampo.length > 0);
+
+  if (tieneFotos) {
+    page.drawText("EVIDENCIA FOTOGRÁFICA", {
+      x: margin,
+      y,
+      size: sectionSize,
+      font: boldFont,
+      color: COLOR_VERDE_INSTITUCIONAL,
+    });
+
+    y -= 25;
+  }
+
   if (fotoRostroUrl) {
     const fotoRostro = await embedImage(pdfDoc, fotoRostroUrl);
     if (fotoRostro) {
-      const { width: imgWidth, height: imgHeight } = calculateFit(fotoRostro.width, fotoRostro.height, 100, 100);
-      page.drawImage(fotoRostro, {
+      const { width: imgWidth, height: imgHeight } = calculateFit(fotoRostro.width, fotoRostro.height, 120, 100);
+      page.drawRectangle({
         x: margin,
+        y: y - imgHeight,
+        width: imgWidth + 10,
+        height: imgHeight + 25,
+        borderColor: COLOR_GRIS_CLARO,
+        borderWidth: 1,
+        color: COLOR_BLANCO,
+      });
+      page.drawImage(fotoRostro, {
+        x: margin + 5,
         y: y - imgHeight,
         width: imgWidth,
         height: imgHeight,
       });
-      y -= imgHeight + 15;
+      page.drawText("Foto del Beneficiario", {
+        x: margin + 5,
+        y: y - imgHeight - 18,
+        size: fontSize - 2,
+        font: boldFont,
+        color: COLOR_GRIS_OSCURO,
+      });
+      y -= imgHeight + 35;
     }
   }
 
-  if (y < 150) {
-    pdfDoc.addPage();
-    y = height - margin;
-  }
-
-  page.drawText("Firma:", { x: margin, y, size: fontSize, font: boldFont });
-  y -= 15;
-
-  const firmaUrl = bitacora.firma_url as string | undefined;
-  if (firmaUrl) {
+  if (firmaUrl && y > 150) {
     const firma = await embedImage(pdfDoc, firmaUrl);
     if (firma) {
-      const { width: imgWidth, height: imgHeight } = calculateFit(firma.width, firma.height, 150, 60);
-      page.drawImage(firma, {
+      const { width: imgWidth, height: imgHeight } = calculateFit(firma.width, firma.height, 180, 60);
+      if (y < imgHeight + 60) {
+        pdfDoc.addPage();
+        y = height - margin;
+      }
+      page.drawRectangle({
         x: margin,
+        y: y - imgHeight,
+        width: imgWidth + 10,
+        height: imgHeight + 25,
+        borderColor: COLOR_GRIS_CLARO,
+        borderWidth: 1,
+        color: COLOR_BLANCO,
+      });
+      page.drawImage(firma, {
+        x: margin + 5,
         y: y - imgHeight,
         width: imgWidth,
         height: imgHeight,
       });
-      y -= imgHeight + 15;
+      page.drawText("Firma del Beneficiario", {
+        x: margin + 5,
+        y: y - imgHeight - 18,
+        size: fontSize - 2,
+        font: boldFont,
+        color: COLOR_GRIS_OSCURO,
+      });
+      y -= imgHeight + 35;
     }
   }
 
-  if (y < 150) {
-    pdfDoc.addPage();
-    y = height - margin;
-  }
+  if (fotosCampo && fotosCampo.length > 0 && y > 150) {
+    page.drawText("Fotos de Campo", {
+      x: margin,
+      y,
+      size: sectionSize,
+      font: boldFont,
+      color: COLOR_VERDE_INSTITUCIONAL,
+    });
+    y -= 20;
 
-  page.drawText("Fotos de Campo:", { x: margin, y, size: fontSize, font: boldFont });
-  y -= 15;
-
-  const fotosCampo = bitacora.fotos_campo as string[] | undefined;
-  if (fotosCampo && fotosCampo.length > 0) {
+    const imgSize = 70;
     let xImg = margin;
-    const imgSize = 80;
     let count = 0;
 
     for (const fotoUrl of fotosCampo) {
@@ -172,13 +449,22 @@ export async function generarPdfBitacora(
 
         if (xImg + w > width - margin) {
           xImg = margin;
-          y -= imgSize + 10;
+          y -= imgSize + 15;
           if (y < 150) {
             pdfDoc.addPage();
             y = height - margin;
           }
         }
 
+        page.drawRectangle({
+          x: xImg - 3,
+          y: y - h - 3,
+          width: w + 6,
+          height: h + 6,
+          borderColor: COLOR_GRIS_CLARO,
+          borderWidth: 1,
+          color: COLOR_BLANCO,
+        });
         page.drawImage(foto, {
           x: xImg,
           y: y - h,
@@ -186,36 +472,47 @@ export async function generarPdfBitacora(
           height: h,
         });
 
-        xImg += w + 10;
+        xImg += w + 15;
         count++;
       }
     }
   }
 
-  for (let i = pdfDoc.getPageCount() - 1; i >= 0; i--) {
+  for (let i = 0; i < pdfDoc.getPageCount(); i++) {
     const p = pdfDoc.getPage(i);
     const pHeight = p.getSize().height;
-    const marginP = 50;
-    let yP = pHeight - marginP;
+    const footY = 40;
 
-    if (i > 0) continue;
-
-    p.drawText(`Fecha de generación: ${new Date().toLocaleString()}`, {
-      x: marginP,
-      y: yP - 20,
-      size: fontSize - 2,
-      font,
-      color: rgb(0.5, 0.5, 0.5),
+    p.drawRectangle({
+      x: margin,
+      y: footY - 10,
+      width: contentWidth,
+      height: 2,
+      color: COLOR_VERDE_INSTITUCIONAL,
     });
 
-    const pdfActividadesUrl = bitacora.pdf_actividades_url as string | undefined;
-    if (pdfActividadesUrl) {
-      p.drawText(`PDF de Actividades: ${pdfActividadesUrl}`, {
-        x: marginP,
-        y: yP - 40,
-        size: fontSize - 2,
+    p.drawText(`Fecha de generación: ${new Date().toLocaleString("es-MX", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`, {
+      x: margin,
+      y: footY - 25,
+      size: fontSize - 2,
+      font,
+      color: COLOR_GRIS_CLARO,
+    });
+
+    const piePagina = config.pie_pagina as string | null;
+    if (piePagina) {
+      p.drawText(piePagina, {
+        x: margin,
+        y: footY - 40,
+        size: fontSize - 3,
         font,
-        color: rgb(0.5, 0.5, 0.5),
+        color: COLOR_GRIS_CLARO,
       });
     }
   }
