@@ -32,6 +32,15 @@ const app = new Hono<{
 }>();
 app.use("*", authMiddleware, requireRole("admin", "coordinador", "tecnico"));
 
+function resolveTecnicoId(tecnicoId: string | undefined, user: JwtPayload): string | null {
+  if (user.rol === "tecnico") {
+    if (tecnicoId && tecnicoId !== user.sub) return null;
+    return user.sub;
+  }
+
+  return tecnicoId ?? null;
+}
+
 function encodePhone(value?: string): string | null {
   if (!value) return null;
   const normalized = value.trim();
@@ -63,15 +72,12 @@ app.get(
     try {
       const user = c.get("user");
       const { id } = c.req.valid("param");
+      const beneficiarioBase = await findBeneficiarioByIdWithAccess(id, user.sub, user.rol);
+      if (!beneficiarioBase) return c.json({ error: "Beneficiario no encontrado" }, 404);
+
       const beneficiario = await findBeneficiarioWithRelations(id);
       if (!beneficiario) return c.json({ error: "Beneficiario no encontrado" }, 404);
-      
-      if (user.rol !== "admin") {
-        const beneficiarioBase = await findBeneficiarioById(id);
-        if (!beneficiarioBase) return c.json({ error: "Beneficiario no encontrado" }, 404);
-        const hasAccess = await existsTecnicoActivoWithCoordinador(beneficiarioBase.tecnico_id, user.sub);
-        if (!hasAccess) return c.json({ error: "Beneficiario no encontrado" }, 404);
-      }
+
       return c.json(beneficiario);
     } catch (e) {
       console.error("[Beneficiarios] Error al obtener:", e);
@@ -101,17 +107,14 @@ app.post(
   async (c) => {
     try {
       const body = c.req.valid("json");
-      console.log("[Beneficiarios] POST body received:", JSON.stringify(body));
       const user = c.get("user");
-      console.log("[Beneficiarios] User:", user.sub, user.rol);
-
-      const tecnicoId = body.tecnico_id || "c8ad06ed-c493-48f4-89c0-15fb800a3469";
-      console.log("[Beneficiarios] Using tecnico_id:", tecnicoId);
+      const tecnicoId = resolveTecnicoId(body.tecnico_id, user);
+      if (!tecnicoId) {
+        return c.json({ error: "tecnico_id es requerido" }, 400);
+      }
 
       const tecnicoValido = await existsTecnicoActivo(tecnicoId);
-      console.log("[Beneficiarios] técnico válido:", tecnicoValido);
       if (!tecnicoValido) {
-        console.log("[Beneficiarios] ERROR: Técnico no encontrado o inactivo:", tecnicoId);
         return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
       }
 
@@ -180,6 +183,9 @@ app.patch(
       }
 
       if (body.tecnico_id) {
+        if (user.rol === "tecnico" && body.tecnico_id !== user.sub) {
+          return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+        }
         const tecnicoValido = await existsTecnicoActivo(body.tecnico_id);
         if (!tecnicoValido) return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
         if (user.rol === "coordinador") {
