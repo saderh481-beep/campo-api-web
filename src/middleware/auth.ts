@@ -15,17 +15,23 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 
   let session: SessionPayload | null = null;
   let useJwtFallback = false;
+  let redisAvailable = true;
 
   try {
     const rawSession = await redis.get(`session:${token}`);
     if (rawSession) {
       session = JSON.parse(rawSession) as SessionPayload;
     } else {
-      useJwtFallback = true;
+      redisAvailable = true;
     }
   } catch (e) {
     console.warn("[Auth] Redis no disponible, usando JWT");
+    redisAvailable = false;
     useJwtFallback = true;
+  }
+
+  if (redisAvailable && !session) {
+    return c.json({ error: "Token inválido o expirado" }, 401);
   }
 
   if (useJwtFallback) {

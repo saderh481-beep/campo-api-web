@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { createHash } from "node:crypto";
@@ -21,6 +21,70 @@ function normalizeRole(role: string): string {
 const app = new Hono<AppEnv>();
 const SESSION_TTL_SECONDS = 86400;
 
+async function handleLogin(c: Context<AppEnv>, correo: string, codigo_acceso: string) {
+  try {
+    const forwardedFor = c.req.header("x-forwarded-for") ?? "unknown";
+    const ip = forwardedFor === "unknown" ? "unknown" : forwardedFor.split(",")[0].trim();
+    const userAgent = c.req.header("user-agent") ?? "unknown";
+
+    const usuario = await findUsuarioParaLogin(correo);
+    if (!usuario) {
+      console.error("[Auth] Usuario no encontrado:", correo);
+      return c.json({ error: "Credenciales inválidas" }, 401);
+    }
+    if (!usuario.hash_codigo_acceso) {
+      console.error("[Auth] Usuario sin hash_codigo_acceso:", correo);
+      return c.json({ error: "Credenciales inválidas" }, 401);
+    }
+
+    const hashIngresado = hashSHA512(codigo_acceso);
+    const valido = hashIngresado === usuario.hash_codigo_acceso;
+    if (!valido) {
+      console.error("[Auth] Hash no coincide para:", correo);
+      return c.json({ error: "Credenciales inválidas" }, 401);
+    }
+
+    if (usuario.rol === "tecnico") {
+      return c.json({ error: "Los técnicos no pueden iniciar sesión desde la web. Usa la aplicación móvil." }, 403);
+    }
+
+    const normalizedRol = normalizeRole(usuario.rol);
+    const token = await signJwt({
+      sub: usuario.id,
+      nombre: usuario.nombre,
+      rol: normalizedRol as "admin" | "coordinador" | "tecnico",
+      correo: usuario.correo,
+    });
+
+    const createdAt = new Date().toISOString();
+    const sessionCache: SessionPayload & { login_at: string; ip: string; user_agent: string | null } = {
+      usuario_id: usuario.id,
+      nombre: usuario.nombre,
+      correo: usuario.correo,
+      rol: normalizedRol as "admin" | "coordinador" | "tecnico",
+      created_at: createdAt,
+      login_at: createdAt,
+      ip,
+      user_agent: userAgent,
+    };
+
+    try {
+      await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionCache));
+    } catch (e) {
+      console.warn("[Auth] Redis no disponible, sesión no guardada en cache");
+    }
+    await createAuthLog(usuario.id, "login", ip, userAgent);
+
+    return c.json({
+      token,
+      usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol },
+    });
+  } catch (e) {
+    console.error("[Auth] Error en verify-codigo-acceso:", e);
+    return c.json({ error: "Error interno del servidor" }, 500);
+  }
+}
+
 app.post(
   "/request-codigo-acceso",
   rateLimitMiddleware(5, 60),
@@ -33,78 +97,31 @@ app.post(
   rateLimitMiddleware(10, 60),
   zValidator("json", z.object({ correo: z.string().email(), codigo_acceso: z.string().regex(/^\d{5,6}$/) })),
   async (c) => {
-    try {
-      const { correo, codigo_acceso } = c.req.valid("json");
-      const forwardedFor = c.req.header("x-forwarded-for") ?? "unknown";
-      const ip = forwardedFor === "unknown" ? "unknown" : forwardedFor.split(",")[0].trim();
-      const userAgent = c.req.header("user-agent") ?? "unknown";
-
-      const usuario = await findUsuarioParaLogin(correo);
-      if (!usuario) {
-        console.error("[Auth] Usuario no encontrado:", correo);
-        return c.json({ error: "Credenciales inválidas" }, 401);
-      }
-      if (!usuario.hash_codigo_acceso) {
-        console.error("[Auth] Usuario sin hash_codigo_acceso:", correo);
-        return c.json({ error: "Credenciales inválidas" }, 401);
-      }
-
-      const hashIngresado = hashSHA512(codigo_acceso);
-      const valido = hashIngresado === usuario.hash_codigo_acceso;
-      if (!valido) {
-        console.error("[Auth] Hash no coincide para:", correo);
-        return c.json({ error: "Credenciales inválidas" }, 401);
-      }
-
-      if (usuario.rol === "tecnico") {
-        return c.json({ error: "Los técnicos no pueden iniciar sesión desde la web. Usa la aplicación móvil." }, 403);
-      }
-
-      const normalizedRol = normalizeRole(usuario.rol);
-      const token = await signJwt({
-        sub: usuario.id,
-        nombre: usuario.nombre,
-        rol: normalizedRol as "admin" | "coordinador" | "tecnico",
-        correo: usuario.correo,
-      });
-
-      const createdAt = new Date().toISOString();
-      const sessionCache: SessionPayload & { login_at: string; ip: string; user_agent: string | null } = {
-        usuario_id: usuario.id,
-        nombre: usuario.nombre,
-        correo: usuario.correo,
-        rol: normalizedRol as "admin" | "coordinador" | "tecnico",
-        created_at: createdAt,
-        login_at: createdAt,
-        ip,
-        user_agent: userAgent,
-      };
-
-      try {
-        await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionCache));
-      } catch (e) {
-        console.warn("[Auth] Redis no disponible, sesión no guardada en cache");
-      }
-      await createAuthLog(usuario.id, "login", ip, userAgent);
-
-      return c.json({
-        token,
-        usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol },
-      });
-    } catch (e) {
-      console.error("[Auth] Error en verify-codigo-acceso:", e);
-      return c.json({ error: "Error interno del servidor" }, 500);
-    }
+    const { correo, codigo_acceso } = c.req.valid("json");
+    return handleLogin(c, correo, codigo_acceso);
   }
 );
 
-app.post("/login", rateLimitMiddleware(10, 60), zValidator("json", z.object({ correo: z.string().email(), codigo_acceso: z.string().regex(/^\d{5,6}$/) })), async (c) => {
-  const body = c.req.valid("json");
-  return c.redirect(`/api/v1/auth/verify-codigo-acceso?correo=${body.correo}&codigo_acceso=${body.codigo_acceso}`, 307);
-});
+app.post(
+  "/login",
+  rateLimitMiddleware(10, 60),
+  zValidator("json", z.object({ correo: z.string().email(), codigo_acceso: z.string().regex(/^\d{5,6}$/) })),
+  async (c) => {
+    const { correo, codigo_acceso } = c.req.valid("json");
+    return handleLogin(c, correo, codigo_acceso);
+  }
+);
 
 app.post("/request-otp", rateLimitMiddleware(5, 60), zValidator("json", z.object({ correo: z.string().email() })), (c) => c.json({ message: "Código ya asignado. Usa tu código de acceso." }));
-app.post("/verify-otp", rateLimitMiddleware(10, 60), zValidator("json", z.object({ correo: z.string().email(), codigo_acceso: z.string().regex(/^\d{5,6}$/) })), async (c) => c.redirect("/api/v1/auth/verify-codigo-acceso", 307));
+app.post(
+  "/verify-otp",
+  rateLimitMiddleware(10, 60),
+  zValidator("json", z.object({ correo: z.string().email(), codigo_acceso: z.string().regex(/^\d{5,6}$/) })),
+  async (c) => {
+    const { correo, codigo_acceso } = c.req.valid("json");
+    return handleLogin(c, correo, codigo_acceso);
+  }
+);
 
 app.get("/me", authMiddleware, async (c) => {
   const user = c.get("user");
