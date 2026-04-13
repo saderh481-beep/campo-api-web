@@ -24,7 +24,7 @@ import {
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("admin", "coordinador"));
+app.use("*", authMiddleware);
 
 app.get("/coordinador-tecnico", async (c) => {
   const user = c.get("user");
@@ -35,6 +35,16 @@ app.get("/coordinador-tecnico", async (c) => {
       JOIN usuarios t ON t.id = td.tecnico_id
       LEFT JOIN usuarios c ON c.id = td.coordinador_id
       WHERE td.coordinador_id = ${user.sub} AND td.activo = true
+    `;
+    return c.json(rows);
+  }
+  if (user.rol === "tecnico") {
+    const rows = await sql`
+      SELECT td.tecnico_id AS id, td.coordinador_id, td.fecha_limite, td.estado_corte, t.nombre AS tecnico_nombre, c.nombre AS coordinador_nombre
+      FROM tecnico_detalles td
+      JOIN usuarios t ON t.id = td.tecnico_id
+      LEFT JOIN usuarios c ON c.id = td.coordinador_id
+      WHERE td.tecnico_id = ${user.sub} AND td.activo = true
     `;
     return c.json(rows);
   }
@@ -117,8 +127,15 @@ app.patch("/coordinador-tecnico/:tecnico_id", zValidator("param", z.object({ tec
 });
 
 app.get("/beneficiario", zValidator("query", z.object({ tecnico_id: z.string().uuid().optional(), beneficiario_id: z.string().uuid().optional(), activo: z.enum(["true", "false"]).optional() })), async (c) => {
+  const user = c.get("user");
   const { tecnico_id, beneficiario_id, activo } = c.req.valid("query");
-  const rows = await listAsignacionesBeneficiario({ tecnico_id, beneficiario_id, activo: activo === "true" ? true : activo === "false" ? false : undefined });
+  
+  let filterTecnicoId = tecnico_id;
+  if (user.rol === "tecnico" && !tecnico_id) {
+    filterTecnicoId = user.sub;
+  }
+  
+  const rows = await listAsignacionesBeneficiario({ tecnico_id: filterTecnicoId, beneficiario_id, activo: activo === "true" ? true : activo === "false" ? false : undefined });
   return c.json(rows);
 });
 
@@ -163,8 +180,15 @@ app.patch("/beneficiario/:id", zValidator("param", z.object({ id: z.string().uui
 });
 
 app.get("/actividad", zValidator("query", z.object({ tecnico_id: z.string().uuid().optional(), actividad_id: z.string().uuid().optional(), activo: z.enum(["true", "false"]).optional() })), async (c) => {
+  const user = c.get("user");
   const { tecnico_id, actividad_id, activo } = c.req.valid("query");
-  const rows = await listAsignacionesActividad({ tecnico_id, actividad_id, activo: activo === "true" ? true : activo === "false" ? false : undefined });
+  
+  let filterTecnicoId = tecnico_id;
+  if (user.rol === "tecnico" && !tecnico_id) {
+    filterTecnicoId = user.sub;
+  }
+  
+  const rows = await listAsignacionesActividad({ tecnico_id: filterTecnicoId, actividad_id, activo: activo === "true" ? true : activo === "false" ? false : undefined });
   return c.json(rows);
 });
 

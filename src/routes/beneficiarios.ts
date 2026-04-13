@@ -30,7 +30,7 @@ const app = new Hono<{
     user: JwtPayload
   }
 }>();
-app.use("*", authMiddleware, requireRole("admin", "coordinador"));
+app.use("*", authMiddleware, requireRole("admin", "coordinador", "tecnico"));
 
 function encodePhone(value?: string): string | null {
   if (!value) return null;
