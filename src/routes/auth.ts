@@ -13,6 +13,11 @@ function hashSHA512(input: string): string {
   return createHash("sha512").update(input).digest("hex");
 }
 
+function normalizeRole(role: string): string {
+  if (role === "administrador") return "admin";
+  return role;
+}
+
 const app = new Hono<AppEnv>();
 const SESSION_TTL_SECONDS = 86400;
 
@@ -55,10 +60,11 @@ app.post(
         return c.json({ error: "Los técnicos no pueden iniciar sesión desde la web. Usa la aplicación móvil." }, 403);
       }
 
+      const normalizedRol = normalizeRole(usuario.rol);
       const token = await signJwt({
         sub: usuario.id,
         nombre: usuario.nombre,
-        rol: usuario.rol as "admin" | "coordinador" | "tecnico",
+        rol: normalizedRol as "admin" | "coordinador" | "tecnico",
         correo: usuario.correo,
       });
 
@@ -67,7 +73,7 @@ app.post(
         usuario_id: usuario.id,
         nombre: usuario.nombre,
         correo: usuario.correo,
-        rol: usuario.rol,
+        rol: normalizedRol as "admin" | "coordinador" | "tecnico",
         created_at: createdAt,
         login_at: createdAt,
         ip,

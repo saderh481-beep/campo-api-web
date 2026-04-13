@@ -2,11 +2,8 @@ import { randomUUID, createHash } from "node:crypto";
 import { redis } from "@/lib/redis";
 import {
   createAuthLog,
-  findTecnicoDetalleParaLogin,
   findUsuarioParaLogin,
-  marcarTecnicoVencido,
 } from "@/models/auth.model";
-import { findConfiguracionByClave } from "@/models/configuraciones.model";
 import type { SessionPayload } from "@/types/http";
 
 const SESSION_TTL_SECONDS = 86400;
@@ -43,47 +40,6 @@ export async function iniciarSesion(input: LoginInput, client: ClientMetadata) {
     return { status: 401 as const, body: { error: "Credenciales invalidas" } };
   }
 
-  let fechaCorteGlobal: string | null = null;
-  if (usuario.rol === "tecnico") {
-    const tecnico = await findTecnicoDetalleParaLogin(usuario.id);
-    if (!tecnico) return { status: 401 as const, body: { error: "Credenciales invalidas" } };
-
-    const configCorte = await findConfiguracionByClave("fecha_corte_global");
-    const fechaConfigurada = (configCorte?.valor as { fecha?: unknown } | null)?.fecha;
-    fechaCorteGlobal = typeof fechaConfigurada === "string" && fechaConfigurada.trim().length > 0
-      ? fechaConfigurada
-      : null;
-
-    const vencido =
-      tecnico.estado_corte === "suspendido" ||
-      tecnico.estado_corte === "baja" ||
-      (fechaCorteGlobal && new Date(fechaCorteGlobal) <= new Date());
-
-    if (vencido) {
-      if (tecnico.estado_corte !== "suspendido" && tecnico.estado_corte !== "baja") {
-        await marcarTecnicoVencido(usuario.id);
-      }
-
-      return {
-        status: 401 as const,
-        body: {
-          error: "periodo_vencido",
-          message: "Tu período de acceso ha concluido. Contacta a tu coordinador.",
-        },
-      };
-    }
-
-    if (!fechaCorteGlobal) {
-      return {
-        status: 401 as const,
-        body: {
-          error: "periodo_no_configurado",
-          message: "No hay fecha de corte global configurada.",
-        },
-      };
-    }
-  }
-
   const token = randomUUID();
   const createdAt = new Date().toISOString();
   const sessionPayload: SessionPayload = {
@@ -92,7 +48,6 @@ export async function iniciarSesion(input: LoginInput, client: ClientMetadata) {
     nombre: usuario.nombre,
     correo: usuario.correo,
     created_at: createdAt,
-    ...(fechaCorteGlobal ? { fecha_limite: fechaCorteGlobal } : {}),
   };
 
   await redis.setex(`session:${token}`, SESSION_TTL_SECONDS, JSON.stringify(sessionPayload));

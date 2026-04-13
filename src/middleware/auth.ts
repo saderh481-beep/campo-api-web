@@ -1,8 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { redis } from "@/lib/redis";
 import { verifyJwt } from "@/lib/jwt";
-import { findConfiguracionByClave } from "@/models/configuraciones.model";
-import { findTecnicoDetalleParaLogin, marcarTecnicoVencido } from "@/models/auth.model";
 import type { JwtPayload } from "@/lib/jwt";
 import type { AppEnv, SessionPayload } from "@/types/http";
 
@@ -49,50 +47,6 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   if (!session) return c.json({ error: "Token inválido o expirado" }, 401);
-
-  try {
-    if (session.rol === "tecnico") {
-      const tecnico = await findTecnicoDetalleParaLogin(session.usuario_id);
-      if (!tecnico) {
-        try { if (!useJwtFallback) await redis.del(`session:${token}`); } catch {}
-        return c.json({ error: "Sesión inválida" }, 401);
-      }
-
-      if (tecnico.estado_corte === "baja" || tecnico.estado_corte === "suspendido") {
-        try { if (!useJwtFallback) await redis.del(`session:${token}`); } catch {}
-        return c.json(
-          { error: "periodo_vencido", message: "Tu período de acceso ha concluido." },
-          401
-        );
-      }
-
-      const configCorte = await findConfiguracionByClave("fecha_corte_global");
-      const fechaConfigurada = (configCorte?.valor as { fecha?: unknown } | null)?.fecha;
-      const fechaCorteGlobal = typeof fechaConfigurada === "string" && fechaConfigurada.trim().length > 0
-        ? fechaConfigurada
-        : null;
-
-      if (!fechaCorteGlobal) {
-        try { if (!useJwtFallback) await redis.del(`session:${token}`); } catch {}
-        return c.json(
-          { error: "periodo_no_configurado", message: "No hay fecha de corte global configurada." },
-          401
-        );
-      }
-
-      if (new Date(fechaCorteGlobal) <= new Date()) {
-        await marcarTecnicoVencido(session.usuario_id);
-        try { if (!useJwtFallback) await redis.del(`session:${token}`); } catch {}
-        return c.json(
-          { error: "periodo_vencido", message: "Tu período de acceso ha concluido." },
-          401
-        );
-      }
-    }
-  } catch (e) {
-    console.error("[Auth] Error al verificar estado del técnico:", e);
-    return c.json({ error: "Error al verificar permisos" }, 500);
-  }
 
   c.set("sessionToken", token);
   c.set("user", {
