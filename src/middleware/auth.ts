@@ -106,6 +106,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 });
 
 function normalizeRole(role: string): string {
+  if (role === "administrador") return "admin";
   return role;
 }
 
