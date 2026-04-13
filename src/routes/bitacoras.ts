@@ -109,7 +109,7 @@ app.patch(
 
 app.patch(
   "/:id/pdf-config",
-  requireRole("admin", "coordinador"),
+  requireRole("admin"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ pdf_edicion: z.record(z.string(), z.unknown()) })),
   async (c) => {
@@ -179,8 +179,7 @@ app.get(
 
 app.post(
   "/:id/pdf/imprimir",
-  zValidator("param", z.object({ id: z.string().uuid() })),
-  requireRole("admin", "coordinador", "tecnico"),
+  requireRole("admin", "coordinador"),
   async (c) => {
     const user = c.get("user");
     const { id } = c.req.valid("param");
