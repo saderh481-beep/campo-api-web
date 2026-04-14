@@ -93,7 +93,7 @@ app.post(
     z.object({
       nombre: z.string().min(2),
       municipio: z.string().min(1),
-      curp: z.string().optional(),
+      curp: z.string().length(18).optional(),
       localidad: z.string().optional(),
       localidad_id: z.string().uuid().optional(),
       direccion: z.string().optional(),
@@ -106,16 +106,21 @@ app.post(
   ),
   async (c) => {
     try {
-      const body = c.req.valid("json");
+const body = c.req.valid("json");
       const user = c.get("user");
       const tecnicoId = resolveTecnicoId(body.tecnico_id, user);
-      if (!tecnicoId) {
-        return c.json({ error: "tecnico_id es requerido" }, 400);
-      }
-
-      const tecnicoValido = await existsTecnicoActivo(tecnicoId);
-      if (!tecnicoValido) {
-        return c.json({ error: "Técnico no encontrado o inactivo" }, 400);
+      
+      // Validar tecnico_id solo si se proporciona
+      if (tecnicoId) {
+        const tecnicoValido = await existsTecnicoActivo(tecnicoId);
+        if (!tecnicoValido) {
+          return c.json({ error: `Técnico con ID ${tecnicoId} no encontrado o inactivo` }, 400);
+        }
+        
+        if (user.rol === "coordinador") {
+          const tieneAcceso = await existsTecnicoActivoWithCoordinador(tecnicoId, user.sub);
+          if (!tieneAcceso) return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+        }
       }
 
       if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
@@ -126,14 +131,10 @@ app.post(
       if (body.coord_parcela && !coordParcela) {
         return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
       }
-      
-      if (user.rol === "coordinador") {
-        const tieneAcceso = await existsTecnicoActivoWithCoordinador(tecnicoId, user.sub);
-        if (!tieneAcceso) return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
-      }
 
-      const nuevo = await createBeneficiarioWithAsignacion(
-        { ...body, tecnico_id: tecnicoId, coordParcela: coordParcela },
+      // Crear beneficiario (con o sin asignación de técnico)
+      const nuevo = await createBeneficiario(
+        { ...body, tecnico_id: tecnicoId ?? null, coordParcela: coordParcela },
         user.sub
       );
       if (!nuevo) return c.json({ error: "Error al crear beneficiario" }, 500);
