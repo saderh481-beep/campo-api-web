@@ -3,6 +3,7 @@ import { sql } from "@/db";
 export type BeneficiarioInput = {
   nombre: string;
   municipio: string;
+  curp?: string;
   localidad?: string;
   localidad_id?: string;
   direccion?: string;
@@ -10,7 +11,7 @@ export type BeneficiarioInput = {
   telefono_principal?: string;
   telefono_secundario?: string;
   coord_parcela?: string;
-  tecnico_id: string;
+  tecnico_id?: string | null;
 };
 
 export type BeneficiarioUpdateInput = {
@@ -170,14 +171,16 @@ export async function createBeneficiario(
   const cpValue = input.cp ?? null;
   const telefonoPrincipalValue = input.telefono_principal ?? null;
   const telefonoSecundarioValue = input.telefono_secundario ?? null;
+  const tecnicoIdValue = input.tecnico_id ?? null;
+  const curpValue = input.curp ?? null;
   const [row] = await sql`
-    INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
+    INSERT INTO beneficiarios (nombre, municipio, curp, localidad, localidad_id, direccion, cp,
                               telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-    VALUES (${input.nombre}, ${input.municipio}, ${localidadValue},
+    VALUES (${input.nombre}, ${input.municipio}, ${curpValue}, ${localidadValue},
             ${localidadIdValue}, ${direccionValue}, ${cpValue},
             ${telefonoPrincipalValue}, ${telefonoSecundarioValue},
-            ${input.coordParcela}::point, ${input.tecnico_id})
-    RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
+            ${input.coordParcela}::point, ${tecnicoIdValue})
+    RETURNING id, nombre, municipio, curp, localidad, localidad_id, direccion, cp,
               telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
   `;
   return row;
@@ -194,27 +197,31 @@ export async function createBeneficiarioWithAsignacion(
   const cpValue = input.cp ?? null;
   const telefonoPrincipalValue = input.telefono_principal ?? null;
   const telefonoSecundarioValue = input.telefono_secundario ?? null;
+  const tecnicoIdValue = input.tecnico_id ?? null;
+  const curpValue = input.curp ?? null;
   try {
     await reserved`BEGIN`;
     const [row] = await reserved`
-      INSERT INTO beneficiarios (nombre, municipio, localidad, localidad_id, direccion, cp,
+      INSERT INTO beneficiarios (nombre, municipio, curp, localidad, localidad_id, direccion, cp,
                                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id)
-      VALUES (${input.nombre}, ${input.municipio}, ${localidadValue},
+      VALUES (${input.nombre}, ${input.municipio}, ${curpValue}, ${localidadValue},
               ${localidadIdValue}, ${direccionValue}, ${cpValue},
               ${telefonoPrincipalValue}, ${telefonoSecundarioValue},
-              ${input.coordParcela}::point, ${input.tecnico_id})
-      RETURNING id, nombre, municipio, localidad, localidad_id, direccion, cp,
+              ${input.coordParcela}::point, ${tecnicoIdValue})
+      RETURNING id, nombre, municipio, curp, localidad, localidad_id, direccion, cp,
                 telefono_principal, telefono_secundario, coord_parcela, tecnico_id, activo, created_at, updated_at
     `;
-    const [existing] = await reserved`
-      SELECT id FROM asignaciones_beneficiario
-      WHERE tecnico_id = ${input.tecnico_id} AND beneficiario_id = ${row.id} AND activo = true
-    `;
-    if (!existing) {
-      await reserved`
-        INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
-        VALUES (${input.tecnico_id}, ${row.id}, ${userId})
+    if (tecnicoIdValue) {
+      const [existing] = await reserved`
+        SELECT id FROM asignaciones_beneficiario
+        WHERE tecnico_id = ${tecnicoIdValue} AND beneficiario_id = ${row.id} AND activo = true
       `;
+      if (!existing) {
+        await reserved`
+          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por)
+          VALUES (${tecnicoIdValue}, ${row.id}, ${userId})
+        `;
+      }
     }
     await reserved`COMMIT`;
     return row;
