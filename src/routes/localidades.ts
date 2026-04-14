@@ -6,7 +6,7 @@ import { createLocalidad, deactivateLocalidad, listLocalidades, updateLocalidad,
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-app.use("*", authMiddleware, requireRole("admin"));
+app.use("*", authMiddleware);
 
 app.get("/", async (c) => {
   const rows = await listLocalidades();
@@ -15,6 +15,7 @@ app.get("/", async (c) => {
 
 app.post(
   "/",
+  requireRole("admin", "coordinador"),
   zValidator(
     "json",
     z.object({
@@ -37,6 +38,7 @@ app.post(
 
 app.patch(
   "/:id",
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -61,6 +63,7 @@ app.patch(
 
 app.delete(
   "/:id",
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
     const { id } = c.req.param();
