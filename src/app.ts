@@ -31,7 +31,7 @@ app.use(
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    allowHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-Session-Id", "x-session-id"],
   })
 );
 
