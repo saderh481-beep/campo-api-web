@@ -104,45 +104,43 @@ app.post(
       tecnico_id: z.string().uuid().optional(),
     })
   ),
-  async (c) => {
+async (c) => {
     try {
-const body = c.req.valid("json");
+      const body = c.req.valid("json");
       const user = c.get("user");
-      const tecnicoId = resolveTecnicoId(body.tecnico_id, user);
-      
-      // Validar tecnico_id solo si se proporciona
-      if (tecnicoId) {
-        const tecnicoValido = await existsTecnicoActivo(tecnicoId);
-        if (!tecnicoValido) {
-          return c.json({ error: `Técnico con ID ${tecnicoId} no encontrado o inactivo` }, 400);
-        }
-        
-        if (user.rol === "coordinador") {
-          const tieneAcceso = await existsTecnicoActivoWithCoordinador(tecnicoId, user.sub);
-          if (!tieneAcceso) return c.json({ error: "Sin permisos para asignar este técnico" }, 403);
+
+      if (body.localidad_id) {
+        const localidadValida = await existsLocalidadActiva(body.localidad_id);
+        if (!localidadValida) {
+          return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
         }
       }
 
-      if (body.localidad_id && !(await existsLocalidadActiva(body.localidad_id))) {
-        return c.json({ error: "Localidad no encontrada o inactiva" }, 400);
-      }
-
-      const coordParcela = normalizePoint(body.coord_parcela);
+      const coordParcela = body.coord_parcela ? normalizePoint(body.coord_parcela) : null;
       if (body.coord_parcela && !coordParcela) {
         return c.json({ error: "coord_parcela debe tener formato 'x,y'" }, 400);
       }
 
-      // Crear beneficiario (con o sin asignación de técnico)
       const nuevo = await createBeneficiario(
-        { ...body, tecnico_id: tecnicoId ?? null, coordParcela: coordParcela },
+        {
+          nombre: body.nombre,
+          municipio: body.municipio,
+          curp: body.curp,
+          localidad: body.localidad,
+          localidad_id: body.localidad_id,
+          direccion: body.direccion,
+          cp: body.cp,
+          telefono_principal: body.telefono_principal,
+          telefono_secundario: body.telefono_secundario,
+          tecnico_id: body.tecnico_id || null,
+          coordParcela: coordParcela,
+        },
         user.sub
       );
-      if (!nuevo) return c.json({ error: "Error al crear beneficiario" }, 500);
       return c.json(nuevo, 201);
     } catch (e) {
       console.error("[Beneficiarios] Error al crear:", e);
-      const message = e instanceof Error ? e.message : String(e);
-      return c.json({ error: "Error al crear beneficiario", detail: message }, 500);
+      return c.json({ error: "Error al crear beneficiario", detail: String(e) }, 500);
     }
   }
 );
