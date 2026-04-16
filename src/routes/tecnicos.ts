@@ -5,6 +5,7 @@ import { createHash, randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { applyCortesVencidos, cerrarCorteById, deactivateTecnico, existsCorreoEnUsuarioActivo, findTecnicoById, isCoordinadorActivo, listAsignacionesByTecnicoId, listTecnicosByRole, updateTecnico, updateTecnicoCodigo, type TecnicoUpdateInput } from "@/models/tecnicos.model";
+import { CodigoAccesoService } from "@/validators/codigo-acceso.validator";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
@@ -84,8 +85,9 @@ app.post(
         return c.json({ error: "El correo ya está registrado" }, 409);
       }
 
-      const codigo = randomInt(10000, 100000).toString();
-      const hashCodigo = hashSHA512(codigo);
+      const codigoService = new CodigoAccesoService();
+      const codigo = await codigoService.generar('tecnico');
+      const hashCodigo = codigoService.hashear(codigo);
 
       const [row] = await sql`
         INSERT INTO usuarios (correo, nombre, rol, telefono, codigo_acceso, hash_codigo_acceso)
@@ -109,7 +111,7 @@ app.post(
 
 app.patch(
   "/:id",
-  requireRole("admin"),
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator(
     "json",
@@ -124,7 +126,13 @@ app.patch(
   async (c) => {
     try {
       const { id } = c.req.param();
+      const user = c.get("user");
       const body = c.req.valid("json");
+      const tecnico = await findTecnicoById(id);
+      if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
+      if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+        return c.json({ error: "Sin permisos" }, 403);
+      }
       if (body.correo && await existsCorreoEnUsuarioActivo(body.correo)) {
         return c.json({ error: "El correo ya está registrado" }, 409);
       }
@@ -148,14 +156,11 @@ app.post(
   async (c) => {
     try {
       const { id } = c.req.param();
-      function hashSHA512(input: string): string {
-  return createHash("sha512").update(input).digest("hex");
-}
-
-const tecnico = await findTecnicoById(id);
+      const tecnico = await findTecnicoById(id);
       if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
-      const codigo = randomInt(10000, 100000).toString();
-      const hashCodigo = hashSHA512(codigo);
+      const codigoService = new CodigoAccesoService();
+      const codigo = await codigoService.generar('tecnico');
+      const hashCodigo = codigoService.hashear(codigo);
       await updateTecnicoCodigo(id, codigo, hashCodigo);
       return c.json({ message: "Código regenerado", codigo });
     } catch (e) {
@@ -200,11 +205,17 @@ app.post(
 
 app.delete(
   "/:id",
-  requireRole("admin"),
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
     try {
       const { id } = c.req.param();
+      const user = c.get("user");
+      const tecnico = await findTecnicoById(id);
+      if (!tecnico) return c.json({ error: "Técnico no encontrado" }, 404);
+      if (user.rol === "coordinador" && tecnico.coordinador_id !== user.sub) {
+        return c.json({ error: "Sin permisos" }, 403);
+      }
       const result = await deactivateTecnico(id);
       if (!result) return c.json({ error: "Técnico no encontrado" }, 404);
       return c.json({ message: "Técnico desactivado" });

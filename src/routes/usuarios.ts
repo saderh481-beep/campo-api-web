@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
+import { CodigoAccesoService } from "@/validators/codigo-acceso.validator";
 import { createUsuario, deactivateUsuario, deleteUsuarioFisico, existsUsuarioByCorreo, listUsuarios, updateUsuario, type UsuarioInput, type UsuarioUpdateInput } from "@/models/usuarios.model";
 import { upsertTecnicoDetalle } from "@/models/tecnico-detalles.model";
 import type { AppEnv } from "@/types/http";
@@ -83,8 +84,9 @@ app.post(
         return c.json({ error: "El correo ya está registrado" }, 409);
       }
 
-const codigo = randomInt(10000, 100000).toString();
-      const hashCodigo = hashSHA512(codigo);
+      const codigoService = new CodigoAccesoService();
+      const codigo = await codigoService.generar(rolNormalizado as any);
+      const hashCodigo = codigoService.hashear(codigo);
 
       const input = {
         correo: body.correo,

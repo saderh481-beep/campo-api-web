@@ -283,7 +283,7 @@ Obtener técnico por ID.
 ### PATCH /tecnicos/:id
 Actualizar técnico.
 
-**Headers:** `Authorization: Bearer <token>` (admin)
+**Headers:** `Authorization: Bearer <token>` (**admin**, **coordinador** - own)
 
 **Request Body:**
 ```json
@@ -307,6 +307,7 @@ Actualizar técnico.
 ```
 
 **Errores:**
+- `403`: Sin permisos (coordinador no own)
 - `409`: El correo ya está registrado
 - `400`: Coordinador inválido o inactivo
 - `404`: Técnico no encontrado
@@ -314,7 +315,7 @@ Actualizar técnico.
 ---
 
 ### POST /tecnicos/:id/codigo
-Regenerar código de acceso.
+Regenerar código de acceso (**5 dígitos único**).
 
 **Headers:** `Authorization: Bearer <token>` (admin)
 
@@ -325,6 +326,8 @@ Regenerar código de acceso.
   "codigo": "54321"
 }
 ```
+
+**Nota:** Web button llama este endpoint, muestra `codigo` en tabla usuarios (GET /usuarios o /tecnicos incluye codigo_acceso).
 
 ---
 
@@ -366,7 +369,7 @@ Cerrar período de corte.
 ### DELETE /tecnicos/:id
 Desactivar técnico.
 
-**Headers:** `Authorization: Bearer <token>` (admin)
+**Headers:** `Authorization: Bearer <token>` (**admin**, **coordinador** - own)
 
 **Response (200):**
 ```json
@@ -374,6 +377,9 @@ Desactivar técnico.
   "message": "Técnico desactivado"
 }
 ```
+
+**Errores:**
+- `403`: Sin permisos (coordinador no own)
 
 ---
 
@@ -1136,7 +1142,7 @@ Listar actividades.
 ### POST /actividades
 Crear actividad.
 
-**Headers:** `Authorization: Bearer <token>` (admin)
+**Headers:** `Authorization: Bearer <token>` (**admin**, **coordinador**)
 
 **Request Body:**
 ```json

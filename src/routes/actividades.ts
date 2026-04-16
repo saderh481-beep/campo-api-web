@@ -15,7 +15,7 @@ app.get("/", requireRole("admin", "coordinador"), async (c) => {
 
 app.post(
   "/",
-  requireRole("admin"),
+  requireRole("admin", "coordinador"),
   zValidator("json", z.object({ nombre: z.string().min(2), descripcion: z.string().optional() })),
   async (c) => {
     const user = c.get("user");
@@ -27,7 +27,7 @@ app.post(
 
 app.patch(
   "/:id",
-  requireRole("admin"),
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   zValidator("json", z.object({ nombre: z.string().min(2).optional(), descripcion: z.string().optional() })),
   async (c) => {
@@ -41,7 +41,7 @@ app.patch(
 
 app.delete(
   "/:id",
-  requireRole("admin"),
+  requireRole("admin", "coordinador"),
   zValidator("param", z.object({ id: z.string().uuid() })),
   async (c) => {
     const { id } = c.req.param();
