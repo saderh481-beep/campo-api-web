@@ -1,59 +1,154 @@
-# API Campo - Documentación por Rol
+# Documentación API Completa - Todos Endpoints con Body/Response/Errores
 
-**Base:** `https://tu-api.com/api/v1`
+**Base:** `/api/v1` | Auth Bearer JWT (except auth) | Rol perms in-line.
 
-## **Admin** (Full access)
+## Autenticación
+**POST /auth/verify-codigo-acceso** - Login
+- **Body**: `{"correo": "user@ej.com", "codigo_acceso": "12345"}`
+- **200 OK**: `{"token": "jwt...", "usuario": {"id", "nombre", "rol"}}` - Inicia sesión
+- **401**: `{"error": "Credenciales inválidas"}` - Wrong code/email
+- **Web**: Form → store token → dashboard
 
-**CRUD**: Usuarios, Tecnicos, Beneficiarios, Actividades, Cadenas, Localidades, Zonas, Configs, Templates.
-**Recomendación web**: Tabs para cada entidad, search/filter/paginate, modals CRUD, confirm DELETE.
+**POST /auth/logout** - Close session
+- **Body**: None
+- **200**: `{"message": "Sesión cerrada"}`
+- **Web**: Clear storage → login page
 
-| Endpoint | Method | Desc |
-|----------|--------|------|
-| /usuarios | GET/POST/PATCH/DELETE | Manage all users |
-| /tecnicos | All | Manage technicians |
-| ... (all)
+## Usuarios (Admin CRUD)
+**GET /usuarios** - List all
+- **200**: Array `[{"id", "nombre", "correo", "rol", "activo", "codigo_acceso"}]`
+- **Web**: Table all users
 
-## **Coordinador** (Own team)
+**POST /usuarios** - Create
+- **Body**: `{"correo", "nombre", "rol": "admin|coordinador|tecnico"}`
+- **201**: `{"id", "nombre", "rol", "activo", "codigo_acceso"}` (auto-gen)
+- **409**: `{"error": "Correo registrado"}`
+- **Web**: Modal → toast codigo
 
-**CRUD own**:
-- Tecnicos (auto-assign)
-- Beneficiarios (docs upload)
-- Actividades/Localidades/Cadenas (global)
-- Asignaciones (team-benef/activ)
+**PATCH /usuarios/:id** - Update
+- **Body**: `{"nombre"?, "correo"?, "rol"?, "codigo_acceso"?, "activo"?}`
+- **200**: Updated user
+- **400**: `{"error": "Código debe 5/6 dig rol"}`
+- **409**: `{"error": "Correo dup"}`
+- **Web**: Edit modal validate length
 
-**View**:
-- Bitacoras/reportes own tecnicos
-- Dashboard stats
+**DELETE /usuarios/:id** - Soft deactivate
+- **200**: `{"message": "Usuario desactivado"}`
+- **Web**: Confirm → table filter active=false
 
-**Recomendación web**:
-- Filter own `coordinador_id`
-- Auto-select own coordinador_id create tecnico
-- Upload progress bar docs
-- Confirm dialogs all DELETE
-- Refresh table post-generate code
+**DELETE /usuarios/:id/force** - Hard + cascade
+- **200**: `{"message": "Usuario eliminado permanentemente"}`
+- **Web**: Super confirm + reload list
 
-**Endpoints**:
-```
-Tecnicos: GET/POST/PATCH/DELETE /tecnicos (own)
-POST /tecnicos/:id/codigo → {codigo} show table
-Beneficiarios: All /beneficiarios (own tecnico)
-Actividades/Localidades/Cadenas: All
-Asignaciones: All own tecnico
-Dashboard/Bitacoras/Reportes: own
-```
+## Tecnicos (Admin/Coordinador own)
+**GET /tecnicos** - List own/team
+- **200**: Array `[{"id", "nombre", "correo", "coordinador_nombre", "codigo_acceso", "activo"}]`
+- **Web**: Table filter coordinador
 
-**Deletes**: All `{message: "Confirmar? Eliminado"}` → UI modal yes/no.
+**GET /tecnicos/:id** - Detail + asigns
+- **200**: User + `"asignaciones": [...]`
+- **403**: No own
 
-**Códigos**: Admin/coordinador 6dig, tecnico 5dig auto-unique.
+**POST /tecnicos** - Create own
+- **Body**: `{"nombre", "correo", "telefono"?, "coordinador_id", "fecha_limite"?:}`
+- **201**: `{"id", ..., "detalle": {}, "codigo": "5dig"}`
+- **409**: Email dup
+- **Web**: Modal auto-fill own coord
 
-## Implement Web Best Practices
-- **Auth**: Store token localStorage, refresh login
-- **Roles**: UI hide/disable non-perms
-- **CRUD**: Table list, + modal create/edit, trash delete confirm
-- **Files**: Drag-drop upload, progress
-- **Codes**: Button → API → toast + refresh row codigo_acceso
-- **Filters**: Search/date/rol/active dropdowns
-- **Paginate**: Infinite scroll or pages
-- **Error**: Global toast HTTP 4xx
+**PATCH /tecnicos/:id** - Update own
+- **Body**: Same POST optional
+- **200**: Updated
+- **403**: Not own coord
 
-¡Ready web integration! No tecnico endpoints (mobile?).
+**POST /tecnicos/:id/codigo** - Regen 5dig (admin)
+- **200**: `{"message": "Regenerado", "codigo": "54321"}`
+- **Web**: Btn row → toast copy clipboard
+
+**POST /aplicar-cortes** - Bulk suspend expired
+- **200**: `{"message": "Corte 3 tecnicos", "tecnicos": []}`
+- **Web**: Schedule cron-like btn
+
+**POST /tecnicos/:id/cerrar-corte** - Suspend specific
+- **200**: `{"message": "Cerrado", "tecnico": {...}}`
+- **403**: Not own
+
+**DELETE /tecnicos/:id** - Deactivate own
+- **200**: `{"message": "Desactivado"}`
+- **Web**: Confirm cascade warn
+
+## Beneficiarios (All own tecnico)
+**GET /beneficiarios** - List own
+- **200**: Array full fields
+- **Web**: Table map coord_parcela
+
+**GET /beneficiarios/:id** - Detail + relaciones
+- **200**: + `"cadenas": [], "documentos": []`
+- **404**: Not found/perm
+
+**POST /beneficiarios** - Create
+- **Body**: `{"nombre", "municipio", "curp"?, "localidad_id"?, "direccion"?, "cp"?, "telefonos"?, "coord_parcela": "x,y", "tecnico_id"?:}`
+- **201**: New
+- **400**: Coord format/local invalid
+- **Web**: Geocode input → Leaflet marker
+
+**PATCH /beneficiarios/:id** - Update/reasign
+- **Body**: Same optional
+- **200**: Updated
+- **403**: Not own tecnico
+
+**DELETE /beneficiarios/:id** - Soft
+- **200**: `{"message": "Desactivado"}`
+- **Web**: Confirm warn asigns
+
+**POST /beneficiarios/:id/cadenas** (admin)
+- **Body**: `{"cadena_ids": []}`
+- **200**: `{"message": "Actualizadas"}`
+
+**POST /beneficiarios/:id/documentos** - Upload
+- **Multipart**: archivo, tipo
+- **201**: New doc
+- **Web**: Drag-drop → gallery
+
+**GET /beneficiarios/:id/documentos**
+- **200**: Array docs
+
+**POST/GET/DEL /beneficiarios/:id/foto-rostro** - Photo
+- **200/DEL null URL**
+- **Web**: Camera/cropper → img preview
+
+Same **firma**
+
+## Asignaciones
+**GET /asignaciones/beneficiario** `?tecnico_id=&beneficiario_id=&activo=`
+- **200**: Array `{"tecnico_nombre", "beneficiario_nombre", "activo"}`
+- **Web**: Matrix checkbox assign
+
+**POST /asignaciones/beneficiario** `{"tecnico_id", "beneficiario_id"}`
+- **201**: New
+- **403**: Coord not own tecnico
+
+**PATCH/DELETE /asignaciones/beneficiario/:id** - Toggle/remove
+- **200**: `{"message": "Eliminada"}`
+
+Same **actividad**, **coordinador-tecnico**
+
+## Actividades (Admin/Coordinador)
+**GET /actividades** - List
+**POST/PATCH/DEL /actividades/:id**
+- **Body**: `{"nombre", "descripcion"?:}`
+- **200/201**: CRUD simple
+- **Web**: List select multi-asign
+
+## Cadenas (Admin/Coordinador)
+Same actividades structure /cadenas-productivas
+
+## Localidades (Admin/Coordinador)
+**POST/PATCH** `{"zona_id"?, "municipio", "nombre", "cp":5dig}`
+- **Web**: Zonas filter CP search
+
+## Bitacoras/Reportes/Dashboard - Similar list/detail/stats
+**Web**: Calendar/charts PDF download btns
+
+**All DELETEs**: Confirm UI, safe cascade/soft.
+
+**Precisa/completa para web dev!** 🎯
