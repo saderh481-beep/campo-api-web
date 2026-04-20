@@ -3,6 +3,7 @@ import { redis } from "@/lib/redis";
 import { verifyJwt } from "@/lib/jwt";
 import type { JwtPayload } from "@/lib/jwt";
 import type { AppEnv, SessionPayload } from "@/types/http";
+import { normalizeRole } from "@/lib/crypto-utils";
 
 type Env = AppEnv & { Variables: { user: JwtPayload; sessionToken: string } };
 
@@ -64,11 +65,6 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 
   return next();
 });
-
-function normalizeRole(role: string): string {
-  if (role === "administrador") return "admin";
-  return role;
-}
 
 export function requireRole(...roles: string[]) {
   return createMiddleware<Env>(async (c, next) => {

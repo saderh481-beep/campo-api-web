@@ -1,22 +1,13 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { createHash } from "node:crypto";
 import { rateLimitMiddleware } from "@/middleware/ratelimit";
 import { authMiddleware } from "@/middleware/auth";
 import { redis } from "@/lib/redis";
 import { signJwt } from "@/lib/jwt";
 import { createAuthLog, findUsuarioParaLogin } from "@/models/auth.model";
 import type { AppEnv, SessionPayload } from "@/types/http";
-
-function hashSHA512(input: string): string {
-  return createHash("sha512").update(input).digest("hex");
-}
-
-function normalizeRole(role: string): string {
-  if (role === "administrador") return "admin";
-  return role;
-}
+import { hashSHA512, normalizeRole } from "@/lib/crypto-utils";
 
 const app = new Hono<AppEnv>();
 const SESSION_TTL_SECONDS = 86400;

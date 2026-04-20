@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { createHash, randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { applyCortesVencidos, cerrarCorteById, deactivateTecnico, existsCorreoEnUsuarioActivo, findTecnicoById, isCoordinadorActivo, listAsignacionesByTecnicoId, listTecnicosByRole, updateTecnico, updateTecnicoCodigo, type TecnicoUpdateInput } from "@/models/tecnicos.model";
@@ -9,10 +8,6 @@ import { CodigoAccesoService } from "@/validators/codigo-acceso.validator";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();
-
-function hashSHA512(input: string): string {
-  return createHash("sha512").update(input).digest("hex");
-}
 
 app.use("*", authMiddleware);
 

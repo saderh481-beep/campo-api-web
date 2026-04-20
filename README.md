@@ -97,6 +97,7 @@ bun run typecheck
 
 ## Novedades recientes
 
+- Refactorizacion de codigo utilitario: las funciones `hashSHA512` y `normalizeRole` se movieron a `src/lib/crypto-utils.ts` para evitar duplicacion (antes estaban definidas en 7+ archivos).
 - Mejoras en manejo de errores: todos los endpoints ahora tienen try-catch para capturar errores de base de datos y retornar respuestas consistentes con codigo 500.
 - Middleware de autenticacion: mejor manejo de errores con try-catch en verificacion de JWT y estado del tecnico.
 - Modelo de usuarios: `deactivateUsuario` ahora establece `activo = false` correctamente.

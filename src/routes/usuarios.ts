@@ -1,20 +1,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { createHash } from "node:crypto";
-import { randomInt } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware, requireRole } from "@/middleware/auth";
 import { CodigoAccesoService } from "@/validators/codigo-acceso.validator";
 import { createUsuario, deactivateUsuario, deleteUsuarioFisico, existsUsuarioByCorreo, listUsuarios, updateUsuario, type UsuarioInput, type UsuarioUpdateInput } from "@/models/usuarios.model";
 import { upsertTecnicoDetalle } from "@/models/tecnico-detalles.model";
 import type { AppEnv } from "@/types/http";
+import { hashSHA512 } from "@/lib/crypto-utils";
 
 const app = new Hono<AppEnv>();
-
-function hashSHA512(input: string): string {
-  return createHash("sha512").update(input).digest("hex");
-}
 
 app.get("/me", authMiddleware, async (c) => {
   try {

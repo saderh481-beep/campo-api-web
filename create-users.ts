@@ -1,8 +1,4 @@
-import { createHash } from "node:crypto";
-
-function hashSHA512(input: string): string {
-  return createHash("sha512").update(input).digest("hex");
-}
+import { hashSHA512 } from "./src/lib/crypto-utils";
 
 type SeedUser = {
   correo: string;

@@ -1,5 +1,6 @@
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { redis } from "@/lib/redis";
+import { hashSHA512 } from "@/lib/crypto-utils";
 import {
   createAuthLog,
   findUsuarioParaLogin,
@@ -17,10 +18,6 @@ type ClientMetadata = {
   ip: string;
   userAgent: string | null;
 };
-
-function hashSHA512(input: string): string {
-  return createHash("sha512").update(input).digest("hex");
-}
 
 export async function solicitarCodigoAcceso() {
   return {
