@@ -155,12 +155,18 @@ Same actividades structure /cadenas-productivas
 - **200**: `application/pdf` - Descarga PDF
 - **Body adicional** se embeben automáticamente desde la bitácora: foto_rostro, firma, fotos_campo
 
-## Documentación OpenAPI
-**GET /docs** - OpenAPI 3.0 spec
-- **200**: JSON spec completo
+## Documentación Dinámica
+Base: `/api/v1/docs` (requiere auth, admin para escribir)
 
-## Rate Limiting (configurable)
-- Variables entorno: `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`, `RATE_LIMIT_AUTH_MAX`, etc.
+**GET /docs** - Listar todos
+**GET /docs/:key** - Ver documento
+**POST /docs/:key** - Crear (admin)
+- Body: `{"titulo", "contenido", "categoria"?}`
+
+**PATCH /docs/:key** - Actualizar (admin)
+**DELETE /docs/:key** - Eliminar (admin)
+
+Tabla: `documento` (id, key, titulo, contenido, categoria, idioma, creado_por, created_at, updated_at)
 
 **All DELETEs**: Confirm UI, safe cascade/soft.
 

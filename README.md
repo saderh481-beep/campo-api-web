@@ -1099,6 +1099,32 @@ Configurable via variables de entorno:
 - `RATE_LIMIT_AUTH_MAX` (default: 10)
 - `RATE_LIMIT_AUTH_WINDOW` (default: 60)
 
+## Documentación Dinámica
+Gestión de documentación desde la base de datos (requiere auth, admin para escribir):
+
+**Base:** `/api/v1/docs`
+
+- **GET /docs** - Listar todos los documentos
+  - 200: `{"documentos": [...]}`
+
+- **GET /docs/:key** - Ver documento específico
+  - 200: Documento completo
+  - 404: Documento no encontrado
+
+- **POST /docs/:key** - Crear documento (admin)
+  - Body: `{"titulo": "...", "contenido": "...", "categoria": "..."}`
+  - 201: Documento creado
+
+- **PATCH /docs/:key** - Actualizar documento (admin)
+  - Body: `{"titulo": "...", "contenido": "...", "categoria": "..."}`
+  - 200: Documento actualizado
+
+- **DELETE /docs/:key** - Eliminar documento (admin)
+  - 200: Documento eliminado
+
+**Tabla:** `documento`
+- id, key, titulo, contenido, categoria, idioma, creado_por, created_at, updated_at
+
 ## Arquitectura
 La API usa Clean Architecture organizada en:
 - `application/` - Controllers, Services, DTOs
