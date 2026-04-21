@@ -1,13 +1,13 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { rateLimitMiddleware } from "@/middleware/ratelimit";
-import { authMiddleware } from "@/middleware/auth";
-import { redis } from "@/lib/redis";
-import { signJwt } from "@/lib/jwt";
-import { createAuthLog, findUsuarioParaLogin } from "@/models/auth.model";
+import { rateLimitMiddleware } from "@/routes/middlewares/middleware/ratelimit";
+import { authMiddleware } from "@/routes/middlewares/middleware/auth";
+import { redis } from "@/infrastructure/lib/redis";
+import { signJwt } from "@/infrastructure/lib/jwt";
+import { createAuthLog, findUsuarioParaLogin } from "@/data/models/auth.model";
 import type { AppEnv, SessionPayload } from "@/types/http";
-import { hashSHA512, normalizeRole } from "@/lib/crypto-utils";
+import { hashSHA512, normalizeRole } from "@/infrastructure/lib/crypto-utils";
 
 const app = new Hono<AppEnv>();
 const SESSION_TTL_SECONDS = 86400;

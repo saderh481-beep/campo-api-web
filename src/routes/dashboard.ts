@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { getCoordinadorMetricas } from "@/models/dashboard.model";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { getCoordinadorMetricas } from "@/data/models/dashboard.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();

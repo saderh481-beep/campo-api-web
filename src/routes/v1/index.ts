@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
 import authRoutes from "@/routes/auth";
+import bitacoraHidalgoRoutes from "@/routes/bitacora-hidalgo";
+import docsRoutes from "@/routes/docs";
 import usuariosRoutes from "@/routes/usuarios";
 import administradoresRoutes from "@/routes/administradores";
 import coordinadoresRoutes from "@/routes/coordinadores";
@@ -40,5 +42,7 @@ v1.route("/zonas", zonasRoutes);
 v1.route("/localidades", localidadesRoutes);
 v1.route("/configuraciones", configuracionesRoutes);
 v1.route("/documentos-plantilla", documentosPlantillaRoutes);
+v1.route("/bitacora-hidalgo", bitacoraHidalgoRoutes);
+v1.route("/docs", docsRoutes);
 
 export default v1;

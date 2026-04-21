@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { sql } from "@/db";
-import { authMiddleware, requireRole } from "@/middleware/auth";
+import { sql } from "@/infrastructure/db";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
 import { CodigoAccesoService } from "@/validators/codigo-acceso.validator";
-import { createUsuario, deactivateUsuario, deleteUsuarioFisico, existsUsuarioByCorreo, listUsuarios, updateUsuario, type UsuarioInput, type UsuarioUpdateInput } from "@/models/usuarios.model";
-import { upsertTecnicoDetalle } from "@/models/tecnico-detalles.model";
+import { createUsuario, deactivateUsuario, deleteUsuarioFisico, existsUsuarioByCorreo, listUsuarios, updateUsuario, type UsuarioInput, type UsuarioUpdateInput } from "@/data/models/usuarios.model";
+import { upsertTecnicoDetalle } from "@/data/models/tecnico-detalles.model";
 import type { AppEnv } from "@/types/http";
-import { hashSHA512 } from "@/lib/crypto-utils";
+import { hashSHA512 } from "@/infrastructure/lib/crypto-utils";
 
 const app = new Hono<AppEnv>();
 

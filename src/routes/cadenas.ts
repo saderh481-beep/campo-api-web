@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { createCadena, deactivateCadena, listCadenas, updateCadena, type CadenaInput, type CadenaUpdateInput } from "@/models/cadenas.model";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { createCadena, deactivateCadena, listCadenas, updateCadena, type CadenaInput, type CadenaUpdateInput } from "@/data/models/cadenas.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();

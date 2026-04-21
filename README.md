@@ -20,6 +20,8 @@ Documentacion actualizada de endpoints expuestos por la API.
   - /api/v1/localidades
   - /api/v1/configuraciones
   - /api/v1/documentos-plantilla
+  - /api/v1/bitacora-hidalgo
+  - /api/v1/docs
 
 ## Autenticacion
 
@@ -1080,3 +1082,27 @@ Errores típicos:
 
 ### Modelo de usuarios
 - `deactivateUsuario` ahora establece `activo = false` correctamente (antes solo actualizaba `updated_at`).
+
+## Bitácora Hidalgo PDF
+- **POST /bitacora-hidencia/generar/:bitacora_id** - Genera PDF oficial del Gobierno de Hidalgo
+  - Body: datos del formulario (pstyp, beneficiario, municipio, calle, localidad, cp, telefono, lat, long, actividades, curp, vo_bo)
+  - Las fotos se obtienen automáticamente desde la bitácora: foto_rostro_url, firma_url, fotos_campo
+  - Retorna: application/pdf
+
+## Documentación OpenAPI
+- **GET /docs** - OpenAPI 3.0 spec en JSON
+
+## Rate Limiting
+Configurable via variables de entorno:
+- `RATE_LIMIT_MAX` (default: 20)
+- `RATE_LIMIT_WINDOW` (default: 60)
+- `RATE_LIMIT_AUTH_MAX` (default: 10)
+- `RATE_LIMIT_AUTH_WINDOW` (default: 60)
+
+## Arquitectura
+La API usa Clean Architecture organizada en:
+- `application/` - Controllers, Services, DTOs
+- `data/` - Models, Repositories
+- `domain/` - Entities, Interfaces
+- `infrastructure/` - DB, Redis, Libs
+- `routes/` - Routes, Middlewares

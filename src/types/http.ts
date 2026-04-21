@@ -1,4 +1,4 @@
-import type { JwtPayload } from "@/lib/jwt";
+import type { JwtPayload } from "@/infrastructure/lib/jwt";
 
 export type AppVariables = {
   user: JwtPayload;

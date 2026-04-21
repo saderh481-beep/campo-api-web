@@ -149,6 +149,19 @@ Same actividades structure /cadenas-productivas
 ## Bitacoras/Reportes/Dashboard - Similar list/detail/stats
 **Web**: Calendar/charts PDF download btns
 
+## Bitácora Hidalgo (PDF)
+**POST /bitacora-hidalgo/generar/:bitacora_id** - Generar PDF oficial
+- **Body**: `{"pstyp", "beneficiario", "municipio", "calle", "localidad", "cp", "telefono", "lat", "long", "actividades", "curp", "vo_bo"?}`
+- **200**: `application/pdf` - Descarga PDF
+- **Body adicional** se embeben automáticamente desde la bitácora: foto_rostro, firma, fotos_campo
+
+## Documentación OpenAPI
+**GET /docs** - OpenAPI 3.0 spec
+- **200**: JSON spec completo
+
+## Rate Limiting (configurable)
+- Variables entorno: `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`, `RATE_LIMIT_AUTH_MAX`, etc.
+
 **All DELETEs**: Confirm UI, safe cascade/soft.
 
 **Precisa/completa para web dev!** 🎯

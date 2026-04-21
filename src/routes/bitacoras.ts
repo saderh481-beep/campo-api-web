@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { sql } from "@/db";
-import { subirPDF, subirFotoRostro, subirFirma, eliminarArchivo } from "@/lib/campo-files";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { generarPdfBitacora } from "@/lib/pdf";
-import type { PdfConfig } from "@/lib/pdf";
-import type { JwtPayload } from "@/lib/jwt";
+import { sql } from "@/infrastructure/db";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { subirPDF, subirFotoRostro, subirFirma, eliminarArchivo } from "@/infrastructure/lib/campo-files";
+import { generarPdfBitacora } from "@/infrastructure/lib/pdf";
+import type { PdfConfig } from "@/infrastructure/lib/pdf";
+import type { JwtPayload } from "@/infrastructure/lib/jwt";
 import type { BitacoraFiltros } from "@/domain/entities/bitacora.entity";
 import {
   findBitacoraById,
@@ -24,7 +24,7 @@ import {
   updateBitacoraFirma,
   updateBitacoraFotosCampo,
   updateBitacoraPdfActividades,
-} from "@/repositories/bitacora.repository";
+} from "@/data/repositories/bitacora.repository";
 
 const app = new Hono<{
   Variables: {

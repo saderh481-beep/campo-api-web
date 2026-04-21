@@ -2,10 +2,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { sql } from "@/db";
-import { uploadBeneficiarioDocumentos } from "@/lib/files";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import type { JwtPayload } from "@/lib/jwt";
+import { sql } from "@/infrastructure/db";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { uploadBeneficiarioDocumentos } from "@/infrastructure/lib/files";
+import { normalizeRole, hashSHA512 } from "@/infrastructure/lib/crypto-utils";
+import type { JwtPayload } from "@/infrastructure/lib/jwt";
 import {
   listBeneficiariosByUser,
   findBeneficiarioByIdWithAccess,
@@ -19,11 +20,11 @@ import {
   deleteBeneficiarioFisico,
   createBeneficiario,
   updateBeneficiario,
-} from "@/models/beneficiarios.model";
-import { updateBeneficiarioCadenas, getCadenasByBeneficiarioId } from "@/models/beneficiario_cadenas.model";
-import { createDocumento, listDocumentosByBeneficiarioId } from "@/models/documentos.model";
-import { existsCadenasActivasByIds } from "@/models/cadenas.model";
-import { existsLocalidadActiva } from "@/models/localidades.model";
+} from "@/data/models/beneficiarios.model";
+import { updateBeneficiarioCadenas, getCadenasByBeneficiarioId } from "@/data/models/beneficiario_cadenas.model";
+import { createDocumento, listDocumentosByBeneficiarioId } from "@/data/models/documentos.model";
+import { existsCadenasActivasByIds } from "@/data/models/cadenas.model";
+import { existsLocalidadActiva } from "@/data/models/localidades.model";
 
 const app = new Hono<{
   Variables: {

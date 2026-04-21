@@ -3,8 +3,8 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 
-import { redis } from "@/lib/redis";
-import { sql } from "@/db";
+import { redis } from "@/infrastructure/lib/redis";
+import { sql } from "@/infrastructure/db";
 import v1Routes from "@/routes/v1";
 
 const app = new Hono();

@@ -1,4 +1,4 @@
-import { hashSHA512 } from "./src/lib/crypto-utils";
+import { hashSHA512 } from "./src/infrastructure/lib/crypto-utils";
 
 type SeedUser = {
   correo: string;
@@ -46,7 +46,7 @@ async function main() {
       throw new Error("DATABASE_URL no esta configurado");
     }
 
-    const { sql } = await import("./src/db");
+    const { sql } = await import("./src/infrastructure/db");
 
     const upserted: Array<{ correo: string; rol: string; codigo: string; id: string }> = [];
 

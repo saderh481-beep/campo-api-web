@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { randomInt } from "node:crypto";
-import { sql } from "@/db";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { createUsuario, deactivateUsuario, existsUsuarioByCorreo, listUsuarios } from "@/models/usuarios.model";
+import { sql } from "@/infrastructure/db";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { createUsuario, deactivateUsuario, existsUsuarioByCorreo, listUsuarios } from "@/data/models/usuarios.model";
 import type { AppEnv } from "@/types/http";
-import { hashSHA512 } from "@/lib/crypto-utils";
+import { hashSHA512 } from "@/infrastructure/lib/crypto-utils";
 
 const app = new Hono<AppEnv>();
 

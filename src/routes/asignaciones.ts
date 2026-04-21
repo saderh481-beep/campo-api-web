@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { sql } from "@/db";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { existsTecnicoActivoWithCoordinador } from "@/models/beneficiarios.model";
+import { sql } from "@/infrastructure/db";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { existsTecnicoActivoWithCoordinador } from "@/data/models/beneficiarios.model";
 import {
   createAsignacionActividad,
   createAsignacionBeneficiario,
@@ -20,7 +20,7 @@ import {
   updateAsignacionActividad,
   updateAsignacionBeneficiario,
   updateAsignacionCoordinadorTecnico,
-} from "@/models/asignaciones.model";
+} from "@/data/models/asignaciones.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();

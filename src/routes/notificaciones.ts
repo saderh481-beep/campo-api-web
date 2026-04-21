@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { listNotificacionesNoLeidas, markAllNotificacionesLeidas, markNotificacionLeida } from "@/models/notificaciones.model";
-import { broadcaster } from "@/lib/broadcaster";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { listNotificacionesNoLeidas, markAllNotificacionesLeidas, markNotificacionLeida } from "@/data/models/notificaciones.model";
+import { broadcaster } from "@/infrastructure/lib/broadcaster";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();

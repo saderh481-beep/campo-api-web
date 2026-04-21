@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { authMiddleware, requireRole } from "@/middleware/auth";
-import { createActividad, deactivateActividad, listActividades, updateActividad, type ActividadInput, type ActividadUpdateInput } from "@/models/actividades.model";
+import { authMiddleware, requireRole } from "@/routes/middlewares/middleware/auth";
+import { createActividad, deactivateActividad, listActividades, updateActividad, type ActividadInput, type ActividadUpdateInput } from "@/data/models/actividades.model";
 import type { AppEnv } from "@/types/http";
 
 const app = new Hono<AppEnv>();

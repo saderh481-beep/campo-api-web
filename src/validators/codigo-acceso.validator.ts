@@ -1,7 +1,7 @@
 import type { Rol } from "@/domain/entities/usuario.entity";
 import type { ICodigoAccesoService } from "@/domain/interfaces/usuario.interface";
 import { createHash, randomInt } from "node:crypto";
-import { existsUsuarioByCodigo } from "@/repositories/usuario.repository";
+import { existsUsuarioByCodigo } from "@/data/repositories/usuario.repository";
 
 export class CodigoAccesoService implements ICodigoAccesoService {
   private readonly LONGITUDES: Record<Exclude<Rol, "tecnico">, number> & { tecnico: number } = {
